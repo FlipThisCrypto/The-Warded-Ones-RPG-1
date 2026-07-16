@@ -3,7 +3,10 @@
 This file teaches future Claude Code sessions how to work safely in this repository.
 
 ## The One Thing (Current)
-The game is live on GitHub Pages. The next priority is: **polish and expand the vertical slice** — add more battles, improve exploration visuals, and begin Godot 4 port planning.
+The game is live on GitHub Pages with two complete quests, six playable
+Jesters, and mobile support. The next priority is: **a second explorable
+map** (the single Warded Grounds screen is now fully used) — then begin
+Godot 4 port planning.
 
 ## Project Overview
 Browser-based RPG vertical slice built with vanilla HTML5 Canvas/JavaScript. Hosted on GitHub Pages from `/docs`.
@@ -80,12 +83,24 @@ git push origin main
 - Do not add blockchain, NFT minting, or online features to the game
 - Finish complete slices before expanding
 
-## Known Issues (v0.1)
-- Browser screenshot tool timeout (game renders fine, canvas blocks DOM snapshot)
-- Exploration area is abstract (geometric) — needs tilemap art
-- No sound music (procedural SFX only)
-- Mobile touch controls not yet implemented
-- No animation for battle hits (static portraits)
+## Current State (v0.2 — after loop 3)
+- Six playable Jesters: 3 starters + 3 recruitable via map NPCs
+  (`recruit: true` in characters.json; recruit NPCs in ExploreManager)
+- Two chained quests (quests.json `unlocks` field); quest journal on J
+- Astral Cougar boss at the animated Star Sigil; enemy AoE support
+- Mobile touch controls (D-pad + ✦/✕ buttons, auto-shown on touch screens)
+- Defeat screen: ENTER retries the battle (pre-battle party snapshot),
+  ESC wakes at half HP; lost encounter zones re-arm (no quest soft-lock)
+- Audio settings persist (warded_ones_settings_v1); saves persist chest/
+  sigil object state
+- Automated playthrough protocol + latest results: PLAYTEST.md
+
+## Known Issues (v0.2)
+- Browser screenshot tool timeout in embedded panes (RAF throttling —
+  drive `game.update(1/60)` manually when testing; see PLAYTEST.md)
+- Exploration area is a single hand-drawn screen — a second map is the
+  next expansion
+- Battle balance is untuned for levels beyond ~5
 
 ## Definition of Done
 A feature is done when: implemented, integrated, tested via browser JS console, and documented.

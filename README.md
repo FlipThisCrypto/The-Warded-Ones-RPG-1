@@ -10,7 +10,8 @@
 
 **[▶ Play in your browser →](https://flipthiscrypto.github.io/The-Warded-Ones-RPG-1/)**
 
-No download required. Works on desktop browsers (Chrome, Firefox, Edge).
+No download required. Works on desktop browsers (Chrome, Firefox, Edge)
+and on phones — touch controls appear automatically on touch screens.
 
 ---
 
@@ -20,20 +21,24 @@ The Warded Ones RPG 1 is an original browser-based fantasy RPG built on The Ward
 
 **Vertical Slice: Jester's Trial**
 
-Play as Motley Max and his Jester companions as they battle through the Warded Grounds to claim the legendary Ward Stone.
+Play as Motley Max and his Jester companions as they battle through the
+Warded Grounds to claim the legendary Ward Stone — then gather the full
+company of six and answer what prowls between the stars.
 
-### Features (v0.1)
+### Features (v0.2)
 - ✦ Branded title screen with animated effects
 - ✦ Intro cutscene with progressive dialogue
-- ✦ Explorable area with NPCs and interactive objects
+- ✦ Explorable area with NPCs, chests, and interactive objects
 - ✦ Turn-based combat with Attack / Ability / Item / Defend
-- ✦ Full party system (Motley Max, Gloam, Tumbling Tess)
-- ✦ Enemy abilities and AI behavior
-- ✦ Status effects (burn, freeze, confuse, etc.)
+- ✦ Six playable Jesters — three starters plus three recruitable in the world
+  (Verity Vex, Cogsworth, Sir Paradox)
+- ✦ Two chained story quests, boss fights, and a quest journal (J)
+- ✦ Enemy abilities, AI behavior, and party-wide boss AoEs
+- ✦ Status effects (burn, freeze, confuse, ATK/SPD down, evade)
 - ✦ EXP, leveling, and gold rewards
-- ✦ Quest tracking system
-- ✦ Save / Load via browser localStorage
-- ✦ Keyboard and mouse/click controls
+- ✦ Defeat screen with Retry Battle / Wake options
+- ✦ Save / Load via browser localStorage (settings persist too)
+- ✦ Keyboard, mouse/click, and mobile touch controls
 
 ---
 
