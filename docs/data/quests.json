@@ -31,7 +31,44 @@
     "rewards": {
       "exp": 150,
       "gold": 100,
-      "items": ["full_restore", "ward_shard"]
+      "items": [
+        "full_restore",
+        "ward_shard"
+      ]
+    },
+    "complete": false,
+    "unlocks": "the_astral_hunt"
+  },
+  {
+    "id": "the_astral_hunt",
+    "title": "The Astral Hunt",
+    "locked": true,
+    "description": "With the Ward Stone claimed, a new constellation burns over the Grounds. Gather every scattered Jester - only the full company can answer what prowls between the stars.",
+    "stages": [
+      {
+        "id": "gather_jesters",
+        "objective": "Recruit the scattered Jesters (0/3)",
+        "description": "Verity Vex, Cogsworth, and Sir Paradox wait somewhere in the Warding Grounds.",
+        "trigger": "recruit",
+        "count": 3,
+        "current": 0,
+        "complete": false
+      },
+      {
+        "id": "face_cougar",
+        "objective": "Answer the howl at the Star Sigil",
+        "description": "Something vast walks down out of the constellations. Meet it at the Star Sigil.",
+        "trigger": "battle_astral_cougar",
+        "complete": false
+      }
+    ],
+    "rewards": {
+      "exp": 300,
+      "gold": 250,
+      "items": [
+        "full_restore",
+        "revive_shard"
+      ]
     },
     "complete": false
   }

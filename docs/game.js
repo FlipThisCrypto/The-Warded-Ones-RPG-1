@@ -548,7 +548,9 @@ class WardedOnesGame {
     if (!stage) return;
     stage.current = (stage.current || 0) + 1;
     if (stage.current >= stage.count) { stage.complete = true; this.save(); } // auto-save on stage completion
-    stage.objective = `Defeat the Guardian Beasts (${Math.min(stage.current, stage.count)}/${stage.count})`;
+    // Update the "(n/m)" counter inside the stage's own objective text.
+    stage.objective = stage.objective.replace(
+      /\(\d+\/\d+\)/, `(${Math.min(stage.current, stage.count)}/${stage.count})`);
   }
 
   getQuestObjective(questId) {
@@ -583,8 +585,23 @@ class WardedOnesGame {
     rewards.items?.forEach(itemId => {
       this.addItem(itemId);
     });
+    // Chain: unlock the follow-up quest, if this one names it.
+    if (quest.unlocks) {
+      const next = this.quests.find(q => q.id === quest.unlocks);
+      if (next && next.locked) {
+        next.locked = false;
+        this.ui.showNotification(`New quest: ${next.title || next.id}!`);
+      }
+    }
     this.ui.questCompleteData = { quest, rewards };
     this.state = STATE.QUEST_COMPLETE;
+    this.save();
+  }
+
+  /** The quest whose objective the HUD tracks: first unlocked, incomplete. */
+  activeQuestId() {
+    const q = this.quests.find(q => !q.locked && !q.complete);
+    return q ? q.id : (this.quests[0] ? this.quests[0].id : '');
   }
 
   // ─── Inventory helpers ────────────────────────────────────
@@ -1023,7 +1040,7 @@ class UI {
     ctx.fillText('W/S: Navigate  |  A/D: Adjust Vol  |  ESC / ENTER: Confirm / Resume', W / 2, by + boxH - 30);
 
     const g = this.game;
-    const objective = g.getQuestObjective('trial_of_wards');
+    const objective = g.getQuestObjective(g.activeQuestId());
     ctx.font = '12px Georgia, serif';
     ctx.fillStyle = 'rgba(150,100,200,0.7)';
     ctx.textAlign = 'center';
@@ -1044,9 +1061,10 @@ class UI {
     ctx.textAlign = 'center';
     ctx.fillText('QUEST JOURNAL', W / 2, by + 46);
 
-    const quests = this.game.quests || [];
+    // Locked quests stay hidden until their predecessor unlocks them.
+    const quests = (this.game.quests || []).filter(q => !q.locked);
     ctx.textAlign = 'left';
-    
+
     if (quests.length === 0) {
       ctx.fillStyle = '#807090';
       ctx.font = "14px Georgia";
@@ -1054,7 +1072,7 @@ class UI {
     } else {
       quests.forEach((q, idx) => {
         const qy = by + 90 + idx * 80;
-        const title = q.id === 'trial_of_wards' ? 'Trial of the Wards' : q.id;
+        const title = q.title || q.id;
         
         ctx.fillStyle = q.complete ? '#80ffcc' : '#f5e01d';
         ctx.font = "bold 14px Cinzel, serif";
@@ -1449,6 +1467,15 @@ class ExploreManager {
         type: 'chest',
         reward: { gold: 250, item: 'elixir' },
         opened: false
+      },
+      {
+        id: 'star_sigil',
+        x: 455, y: 95,      // top-center of the grounds, between alcove and pedestal
+        label: 'Star Sigil',
+        color: '#a0d8ff',
+        radius: 22,
+        type: 'sigil',
+        defeated: false
       }
     ];
 
@@ -1473,6 +1500,14 @@ class ExploreManager {
           if (this.npcs[i]) this.npcs[i].talked = ns.talked;
         });
       }
+      if (savedData.objects) {
+        savedData.objects.forEach((os, i) => {
+          if (this.objects[i]) {
+            if (os.opened !== undefined) this.objects[i].opened = os.opened;
+            if (os.defeated !== undefined) this.objects[i].defeated = os.defeated;
+          }
+        });
+      }
       if (savedData.encounter_zones) {
         savedData.encounter_zones.forEach((ez, i) => {
           if (this.encounter_zones[i]) this.encounter_zones[i].used = ez.used;
@@ -1489,8 +1524,49 @@ class ExploreManager {
       elderTalked: this.elderTalked,
       stoneTouched: this.stoneTouched,
       npcs: this.npcs.map(n => ({ talked: n.talked })),
+      objects: this.objects.map(o => ({ opened: o.opened, defeated: o.defeated })),
       encounter_zones: this.encounter_zones.map(z => ({ used: z.used })),
     };
+  }
+
+  /** Star Sigil: a slow-turning constellation diamond with orbiting motes. */
+  _renderSigil(ctx, obj, t) {
+    const done = obj.defeated;
+    const pulse = done ? 0.35 : 0.55 + Math.sin(t * 2.2) * 0.35;
+    const [r, g, b] = done ? [120, 220, 160] : [160, 210, 255];
+    const halo = ctx.createRadialGradient(obj.x, obj.y, 0, obj.x, obj.y, 52);
+    halo.addColorStop(0, `rgba(${r},${g},${b},${0.10 + pulse * 0.12})`);
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(obj.x, obj.y, 52, 0, Math.PI * 2); ctx.fill();
+    // four-point star
+    ctx.save();
+    ctx.translate(obj.x, obj.y);
+    ctx.rotate(t * (done ? 0.15 : 0.5));
+    ctx.strokeStyle = `rgba(${r},${g},${b},${0.55 + pulse * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2;
+      const outer = 20, inner = 6;
+      ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+      ctx.lineTo(Math.cos(a + Math.PI / 4) * inner, Math.sin(a + Math.PI / 4) * inner);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.restore();
+    // orbiting motes
+    for (let i = 0; i < 3; i++) {
+      const a = t * 1.4 + i * (Math.PI * 2 / 3);
+      ctx.fillStyle = `rgba(${r},${g},${b},${0.5 + Math.sin(t * 3 + i) * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(obj.x + Math.cos(a) * 30, obj.y + Math.sin(a) * 12, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // label
+    ctx.fillStyle = `rgba(${r},${g},${b},0.75)`;
+    ctx.font = '11px Cinzel, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(obj.label, obj.x, obj.y + 44);
   }
 
   update(dt, canvas) {
@@ -1600,6 +1676,7 @@ class ExploreManager {
                 g.party.push(g.createPartyMember(def));
                 g.ui.showNotification(`${def.name} joined the party!`);
                 g.audio.playVictory();
+                g.incrementQuestCount('the_astral_hunt', 'gather_jesters');
               }
               g.state = STATE.EXPLORE;
             });
@@ -1646,6 +1723,35 @@ class ExploreManager {
           }
           
           g.ui.showNotification(logMsg);
+          return;
+        }
+
+        if (obj.type === 'sigil') {
+          const quest = g.quests.find(q => q.id === 'the_astral_hunt');
+          if (!quest || quest.locked) {
+            g.ui.showNotification('A dormant sigil of stars. It does not answer... yet.');
+            g.audio.playTone(220, 0.3, 'sine', 0.15);
+            return;
+          }
+          if (obj.defeated) {
+            g.ui.showNotification('The sigil rests. The constellation above is calm.');
+            g.audio.playTone(440, 0.2, 'sine', 0.15);
+            return;
+          }
+          if (!g.isQuestStageDone('the_astral_hunt', 'gather_jesters')) {
+            g.ui.showNotification('The sigil hums... it awaits the full company of Jesters.');
+            g.audio.playTone(300, 0.3, 'sine', 0.18);
+            return;
+          }
+          g.startDialogue('battle_intro_cougar', () => {
+            g.startBattle(['astral_cougar'], 'battle_bg3', () => {
+              obj.defeated = true;
+              g.advanceQuest('the_astral_hunt', 'face_cougar');
+              g.startDialogue('astral_hunt_complete', () => {
+                g.completeQuest('the_astral_hunt');
+              });
+            }, () => {});
+          });
           return;
         }
 
@@ -2102,6 +2208,10 @@ class ExploreManager {
     this.objects.forEach(obj => {
       if (obj.type === 'chest') {
         this._renderChest(ctx, obj, t);
+        return;
+      }
+      if (obj.type === 'sigil') {
+        this._renderSigil(ctx, obj, t);
         return;
       }
       const pulse = 0.6 + Math.sin(t * 1.8) * 0.4;

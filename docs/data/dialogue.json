@@ -242,5 +242,22 @@
       "portrait": "assets/characters/motley_max.png",
       "text": "Everyone - TOGETHER!"
     }
+  ],
+  "astral_hunt_complete": [
+    {
+      "speaker": "Sir Paradox",
+      "portrait": "assets/characters/sir_paradox.png",
+      "text": "It fell exactly as I foresaw. Also I am astonished. Both, as usual."
+    },
+    {
+      "speaker": "Verity Vex",
+      "portrait": "assets/characters/verity_vex.png",
+      "text": "The constellation is quiet again. The Grounds are truly warded now - all six of us, together."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "Six jesters, one sky, zero cougars. I call that a punchline."
+    }
   ]
 }
