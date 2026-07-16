@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>The Warded Ones RPG – Jester's Trial</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
@@ -84,11 +84,75 @@
       #controls-bar { font-size: 9px; gap: 10px; padding: 4px 8px; }
       .key { padding: 1px 3px; font-size: 9px; }
     }
+
+    /* ── Touch controls (shown only when a touch screen is detected) ── */
+    #touch-dpad, #touch-actions {
+      display: none;
+      position: fixed;
+      bottom: 18px;
+      z-index: 10;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body.touch-mode #touch-dpad,
+    body.touch-mode #touch-actions { display: grid; }
+    body.touch-mode #controls-bar { display: none; }
+
+    #touch-dpad {
+      left: 14px;
+      grid-template-columns: repeat(3, 52px);
+      grid-template-rows: repeat(3, 52px);
+      gap: 2px;
+    }
+    #touch-actions {
+      right: 14px;
+      grid-template-columns: 64px 64px;
+      gap: 14px;
+      align-items: end;
+    }
+
+    .touch-btn {
+      background: rgba(30, 10, 60, 0.55);
+      border: 2px solid rgba(150, 90, 230, 0.55);
+      border-radius: 12px;
+      color: rgba(220, 190, 255, 0.9);
+      font-family: 'Cinzel', Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .touch-btn:active, .touch-btn.held {
+      background: rgba(120, 60, 200, 0.65);
+      border-color: rgba(220, 180, 255, 0.9);
+    }
+    .touch-btn.round { border-radius: 50%; height: 64px; }
+    .touch-btn.confirm { border-color: rgba(120, 220, 160, 0.65); color: rgba(190, 255, 215, 0.95); }
+    .touch-btn.spacer { visibility: hidden; }
   </style>
 </head>
 <body>
   <div id="game-wrapper">
     <canvas id="game-canvas" tabindex="0"></canvas>
+    <div id="touch-dpad" aria-hidden="true">
+      <div class="touch-btn spacer"></div>
+      <div class="touch-btn" data-code="ArrowUp">▲</div>
+      <div class="touch-btn spacer"></div>
+      <div class="touch-btn" data-code="ArrowLeft">◀</div>
+      <div class="touch-btn spacer"></div>
+      <div class="touch-btn" data-code="ArrowRight">▶</div>
+      <div class="touch-btn spacer"></div>
+      <div class="touch-btn" data-code="ArrowDown">▼</div>
+      <div class="touch-btn spacer"></div>
+    </div>
+    <div id="touch-actions" aria-hidden="true">
+      <div class="touch-btn round" data-tap="Escape">✕</div>
+      <div class="touch-btn round confirm" data-tap="Enter">✦</div>
+    </div>
     <div id="controls-bar">
       <span><span class="key">WASD</span> Move</span>
       <span><span class="key">F / Enter</span> Interact/Confirm</span>

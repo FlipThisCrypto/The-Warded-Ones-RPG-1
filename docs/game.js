@@ -3537,6 +3537,49 @@ function setupClickHandler(game, canvas) {
   });
 }
 
+// ─── Touch controls (mobile) ─────────────────────────────────
+// Virtual D-pad + Confirm/Back buttons that feed the same InputManager
+// paths as the keyboard: D-pad holds set input.keys (movement) and fire
+// onKey once (menu navigation); action buttons are tap-only synthetic
+// key presses. Shown only when a touch screen is present.
+function setupTouchControls(game) {
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (!isTouch) return;
+  document.body.classList.add('touch-mode');
+
+  const press = (code) => {
+    game.audio.initContext();
+    game.input.onKey({ code });
+    game.input.keys[code] = false; // tap semantics: never leave a stuck key
+  };
+
+  document.querySelectorAll('#touch-dpad .touch-btn[data-code]').forEach(btn => {
+    const code = btn.dataset.code;
+    const down = (e) => {
+      e.preventDefault();
+      btn.classList.add('held');
+      game.audio.initContext();
+      game.input.onKey({ code });   // single fire for menus
+      game.input.keys[code] = true; // held for explore movement
+    };
+    const up = (e) => {
+      e.preventDefault();
+      btn.classList.remove('held');
+      game.input.keys[code] = false;
+    };
+    btn.addEventListener('touchstart', down, { passive: false });
+    btn.addEventListener('touchend', up, { passive: false });
+    btn.addEventListener('touchcancel', up, { passive: false });
+  });
+
+  document.querySelectorAll('#touch-actions .touch-btn[data-tap]').forEach(btn => {
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      press(btn.dataset.tap);
+    }, { passive: false });
+  });
+}
+
 // ─── Bootstrap ───────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.getElementById('game-canvas');
@@ -3561,6 +3604,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   const game = window.game = new WardedOnesGame();
   setupClickHandler(game, canvas);
+  setupTouchControls(game);
 
   // Loading screen
   const ctx = canvas.getContext('2d');
