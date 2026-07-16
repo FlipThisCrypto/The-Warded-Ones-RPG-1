@@ -1,0 +1,59 @@
+[
+  {
+    "id": "motley_max",
+    "name": "Motley Max",
+    "title": "The Jester of Chaos",
+    "class": "Trickster",
+    "portrait": "assets/characters/motley_max.png",
+    "stats": {
+      "hp": 140, "mp": 90,
+      "atk": 28, "def": 14, "spd": 22, "lck": 18
+    },
+    "growth": {
+      "hp": 18, "mp": 10,
+      "atk": 4, "def": 2, "spd": 3, "lck": 3
+    },
+    "abilities": ["jester_gambit", "shuffle", "healing_jig", "wild_card"],
+    "description": "A chaotic jester whose tricks can swing between brilliant and catastrophic. High luck amplifies his unpredictable power.",
+    "battle_quote": "Let the games begin!",
+    "victory_quote": "Was there ever any doubt?"
+  },
+  {
+    "id": "gloam",
+    "name": "Gloam",
+    "title": "The Puppeteer",
+    "class": "Shadow Mage",
+    "portrait": "assets/characters/gloam.png",
+    "stats": {
+      "hp": 110, "mp": 130,
+      "atk": 18, "def": 12, "spd": 19, "lck": 10
+    },
+    "growth": {
+      "hp": 12, "mp": 16,
+      "atk": 2, "def": 2, "spd": 2, "lck": 1
+    },
+    "abilities": ["puppet_strike", "shadow_web", "void_drain", "marionette"],
+    "description": "A master of shadow puppetry who controls enemies from afar. Excels at weakening foes before finishing them.",
+    "battle_quote": "Dance for me...",
+    "victory_quote": "Your strings were always mine to pull."
+  },
+  {
+    "id": "tumbling_tess",
+    "name": "Tess",
+    "title": "The Tumbling One",
+    "class": "Acrobat",
+    "portrait": "assets/characters/tumbling_tess.png",
+    "stats": {
+      "hp": 125, "mp": 70,
+      "atk": 32, "def": 10, "spd": 28, "lck": 14
+    },
+    "growth": {
+      "hp": 15, "mp": 8,
+      "atk": 5, "def": 1, "spd": 4, "lck": 2
+    },
+    "abilities": ["acrobatic_strike", "aerial_assault", "evasive_roll", "pinwheel"],
+    "description": "The fastest of the jesters, Tess strikes before enemies can react. Low defense but devastating offensive output.",
+    "battle_quote": "Try to keep up!",
+    "victory_quote": "Speed is everything."
+  }
+]

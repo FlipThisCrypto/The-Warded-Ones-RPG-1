@@ -1,0 +1,57 @@
+[
+  {
+    "id": "healing_potion",
+    "name": "Healing Potion",
+    "type": "consumable",
+    "target": "single_ally",
+    "effect": "heal_hp",
+    "value": 80,
+    "description": "Restores 80 HP to one ally.",
+    "price": 50,
+    "icon": "🧪"
+  },
+  {
+    "id": "ether_orb",
+    "name": "Ether Orb",
+    "type": "consumable",
+    "target": "single_ally",
+    "effect": "restore_mp",
+    "value": 40,
+    "description": "Restores 40 MP to one ally.",
+    "price": 60,
+    "icon": "🔮"
+  },
+  {
+    "id": "ward_shard",
+    "name": "Ward Shard",
+    "type": "consumable",
+    "target": "single_ally",
+    "effect": "shield",
+    "value": 30,
+    "description": "Absorbs up to 30 damage on the next hit.",
+    "price": 40,
+    "icon": "🛡️"
+  },
+  {
+    "id": "full_restore",
+    "name": "Full Restore",
+    "type": "consumable",
+    "target": "single_ally",
+    "effect": "full_heal",
+    "value": 999,
+    "description": "Fully restores HP and MP of one ally.",
+    "price": 300,
+    "icon": "✨"
+  },
+  {
+    "id": "revive_shard",
+    "name": "Revive Shard",
+    "type": "consumable",
+    "target": "single_ally",
+    "effect": "revive",
+    "value": 50,
+    "description": "Revives a fallen ally with 50% HP.",
+    "price": 150,
+    "icon": "💫"
+  }
+]

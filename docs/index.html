@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Warded Ones RPG – Jester's Trial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #030010;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Cinzel', Georgia, serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Subtle animated starfield background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(80, 20, 120, 0.15) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(20, 10, 80, 0.2) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #game-wrapper {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    #game-canvas {
+      display: block;
+      image-rendering: auto;
+      cursor: default;
+      border: 2px solid rgba(120, 60, 200, 0.4);
+      box-shadow:
+        0 0 40px rgba(100, 30, 180, 0.4),
+        0 0 80px rgba(60, 10, 100, 0.2),
+        inset 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    #controls-bar {
+      background: rgba(5, 0, 20, 0.8);
+      border: 1px solid rgba(80, 40, 140, 0.4);
+      border-top: none;
+      padding: 6px 20px;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      font-size: 11px;
+      color: rgba(160, 100, 220, 0.7);
+      letter-spacing: 0.5px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    #controls-bar span { display: flex; align-items: center; gap: 6px; }
+    .key {
+      background: rgba(80, 40, 140, 0.4);
+      border: 1px solid rgba(120, 60, 200, 0.5);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: monospace;
+      font-size: 10px;
+      color: rgba(200, 160, 255, 0.9);
+    }
+
+    /* Prevent touch zoom on mobile */
+    @media (max-width: 600px) {
+      #controls-bar { font-size: 9px; gap: 10px; padding: 4px 8px; }
+      .key { padding: 1px 3px; font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-wrapper">
+    <canvas id="game-canvas" tabindex="0"></canvas>
+    <div id="controls-bar">
+      <span><span class="key">WASD</span> Move</span>
+      <span><span class="key">F / Enter</span> Interact/Confirm</span>
+      <span><span class="key">X / Esc</span> Cancel/Pause</span>
+      <span><span class="key">Click</span> Also works</span>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,309 @@
+THE WARDED ONES RPG MASTER CHECKLIST v1.0
+Phase 0 — Foundation
+Vision
+ Define the core vision
+ Mission statement
+ Design pillars
+ Core gameplay philosophy
+ Player experience goals
+ Art direction
+ Audio direction
+ Story tone
+ Canon rules
+ "Never break these rules"
+Phase 1 — World Bible
+Universe
+ Creation myth
+ Timeline
+ Continents
+ Regions
+ Kingdoms
+ Cities
+ Villages
+ Forests
+ Oceans
+ Mountains
+ Caves
+ Dungeons
+ Ruins
+ Towers
+ Shrines
+ Hidden realms
+ Alternate dimensions
+History
+ Ancient age
+ Great wars
+ Legendary heroes
+ Legendary villains
+ Lost civilizations
+ Magical disasters
+ Current era
+Lore
+ Gods
+ Wards
+ Magic system
+ Religions
+ Cultures
+ Languages
+ Currency
+ Calendar
+ Holidays
+ Myths
+ Legends
+Phase 2 — Character Bible
+
+For every character:
+
+Identity
+
+ Name
+ Title
+ Age
+ Height
+ Weight
+ Birthday
+ Alignment
+
+Visual
+
+ Portrait
+ Pixel sprite
+ Walking animation
+ Idle
+ Attack
+ Magic
+ Hurt
+ Death
+ Victory
+
+Story
+
+ Biography
+ Motivation
+ Fear
+ Secret
+ Relationships
+ Character arc
+
+Gameplay
+
+ Class
+ Weapon
+ Armor
+ Passive abilities
+ Skill tree
+ Ultimate ability
+ Stat growth
+
+Voice
+
+ Personality
+ Speech style
+ Battle quotes
+ Victory quotes
+ NPC dialogue
+Phase 3 — Monsters
+
+Every monster
+
+ Concept
+ Sprite
+ Animations
+ Lore
+ Habitat
+ Stats
+ Skills
+ AI
+ Weaknesses
+ Resistances
+ Loot
+ Rare drops
+ Boss variants
+Phase 4 — Classes
+
+Every class
+
+ Lore
+ Equipment
+ Skills
+ Progression
+ Master abilities
+ Promotion
+Phase 5 — Equipment
+
+Weapons
+
+ Daggers
+ Swords
+ Great swords
+ Spears
+ Axes
+ Hammers
+ Bows
+ Guns
+ Wands
+ Staffs
+ Legendary weapons
+
+Armor
+
+ Helmets
+ Chest
+ Gloves
+ Boots
+ Rings
+ Amulets
+ Relics
+Phase 6 — Items
+ Potions
+ Food
+ Buffs
+ Debuffs
+ Quest items
+ Crafting
+ Keys
+ Treasure
+ Rare artifacts
+Phase 7 — Magic
+ Schools
+ Elements
+ Buffs
+ Debuffs
+ Healing
+ Summons
+ Ultimate spells
+Phase 8 — Quests
+
+Main story
+
+ Chapter 1
+ Chapter 2
+ Chapter 3
+ Final chapter
+
+Side quests
+
+ Companion quests
+ Hidden quests
+ Legendary quests
+ Guild quests
+ Puzzle quests
+Phase 9 — Maps
+
+Every map
+
+ Concept
+ Layout
+ Pixel art
+ Collision
+ NPCs
+ Music
+ Lighting
+ Secrets
+ Treasure
+ Bosses
+Phase 10 — Music
+ Main theme
+ Character themes
+ Town
+ Forest
+ Dungeon
+ Boss
+ Final boss
+ Ending
+ Credits
+Phase 11 — Sound
+ UI
+ Magic
+ Footsteps
+ Weather
+ Combat
+ Monsters
+Phase 12 — Engine
+
+Movement
+
+ Walking
+ Running
+ Collision
+
+Combat
+
+ Turn order
+ Damage
+ Status effects
+ Victory
+ Rewards
+
+Inventory
+
+ Equipment
+ Crafting
+ Shops
+
+World
+
+ Save
+ Load
+ Fast travel
+ Vehicles
+Phase 13 — UI
+ Main menu
+ Inventory
+ Equipment
+ Skills
+ Journal
+ Quest log
+ Save
+ Map
+Phase 14 — Writing
+ Script
+ NPC dialogue
+ Item descriptions
+ Books
+ Lore entries
+ Tutorials
+Phase 15 — Polish
+ Balance
+ QA
+ Bug fixing
+ Optimization
+ Accessibility
+ Achievements
+ Credits
+Phase 16 — AI Factory
+
+This is the part I think is unique to Fiend Studios.
+
+Instead of "making a game," build the game factory.
+
+ Character Generator Agent
+ Monster Generator Agent
+ Quest Writer Agent
+ Dialogue Agent
+ Pixel Art Agent
+ Portrait Agent
+ Animation Agent
+ Music Composer Agent
+ Sound FX Agent
+ Map Builder Agent
+ Dungeon Builder Agent
+ Item Generator Agent
+ Skill Designer Agent
+ Combat Balancer Agent
+ Economy Balancer Agent
+ QA Agent
+ Playtesting Agent
+ Documentation Agent
+ Lore Consistency Agent
+ Save Compatibility Agent
+
+Every agent should be governed by FIEND.md so it asks, "What's the One Thing?" and only works on the highest-priority unfinished task before handing off to the next agent.
+
+The final milestone
+
+The most important checkbox isn't "Release RPG I."
+
+It's:
+
+ The Warded Ones RPG Factory can create an entire new RPG campaign, from concept to playable build, using the same engine and AI pipeline.

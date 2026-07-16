@@ -1,0 +1,46 @@
+# NFT collections (too large for GitHub - use Git LFS if needed)
+Big Cats/build/
+Gilded Bovines/
+Gilded Giraffes/
+Gleaming Bears/
+Monkey Magic/
+The Warded Ones - Circles of Power/
+The Warded Ones - Warded Familia/
+The Warded Ones WEB APP/
+Warded Beasts 1of1s/
+
+# Keep top-level Big Cats PNGs but exclude build folder
+Big Cats/build/
+
+# Large NFT collections - keep source but exclude build outputs
+The Warded Ones/The Warded Ones Series 1/
+The Warded Ones/The Totems Series 1/
+The Warded Ones/promo videos/
+The Warded Ones/rings-nft-site/
+The Warded Ones/Weekly Breakdown/
+The Warded Ones - Jesters/videos/
+The Warded Ones - Jesters/finished videos/
+The Warded Ones - Jesters/new/new finished starting image/
+The Warded Ones - Jesters/new/15 to 28/
+The Warded Ones - Jesters/*.mp4
+The Warded Ones - Jesters/*.mp3
+The Warded Ones - Jesters/*.cspro
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+*.swp
+
+# Godot (future)
+.godot/
+*.import
+export_presets.cfg

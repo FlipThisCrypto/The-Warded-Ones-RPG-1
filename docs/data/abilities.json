@@ -1,0 +1,221 @@
+{
+  "jester_gambit": {
+    "id": "jester_gambit",
+    "name": "Jester's Gambit",
+    "mp_cost": 15,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.8,
+    "variance": 0.5,
+    "effect": "random_power",
+    "description": "Deals 1x to 3x damage — completely unpredictable."
+  },
+  "shuffle": {
+    "id": "shuffle",
+    "name": "Shuffle",
+    "mp_cost": 12,
+    "target": "single_enemy",
+    "type": "debuff",
+    "power": 0,
+    "effect": "confuse",
+    "effect_duration": 2,
+    "description": "Confuses an enemy, causing it to sometimes attack itself."
+  },
+  "healing_jig": {
+    "id": "healing_jig",
+    "name": "Healing Jig",
+    "mp_cost": 18,
+    "target": "single_ally",
+    "type": "heal",
+    "power": 40,
+    "description": "A joyful dance that restores 40 HP."
+  },
+  "wild_card": {
+    "id": "wild_card",
+    "name": "Wild Card",
+    "mp_cost": 30,
+    "target": "all_enemies",
+    "type": "attack",
+    "power": 1.2,
+    "effect": "random_status",
+    "description": "Strikes all enemies and applies a random status effect."
+  },
+  "puppet_strike": {
+    "id": "puppet_strike",
+    "name": "Puppet Strike",
+    "mp_cost": 10,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.0,
+    "effect": "atk_down",
+    "effect_duration": 2,
+    "description": "Attacks and reduces the target's ATK."
+  },
+  "shadow_web": {
+    "id": "shadow_web",
+    "name": "Shadow Web",
+    "mp_cost": 22,
+    "target": "all_enemies",
+    "type": "attack",
+    "power": 0.7,
+    "description": "Wraps all enemies in shadow, dealing moderate damage to each."
+  },
+  "void_drain": {
+    "id": "void_drain",
+    "name": "Void Drain",
+    "mp_cost": 16,
+    "target": "single_enemy",
+    "type": "drain",
+    "power": 0.8,
+    "description": "Drains HP from target and transfers it to Gloam."
+  },
+  "marionette": {
+    "id": "marionette",
+    "name": "Marionette",
+    "mp_cost": 35,
+    "target": "single_enemy",
+    "type": "control",
+    "power": 0,
+    "effect": "control",
+    "effect_duration": 1,
+    "description": "Takes full control of an enemy for one turn."
+  },
+  "acrobatic_strike": {
+    "id": "acrobatic_strike",
+    "name": "Acrobatic Strike",
+    "mp_cost": 8,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.3,
+    "accuracy": 1.0,
+    "description": "A precise strike that always hits. Ignores 25% of defense."
+  },
+  "aerial_assault": {
+    "id": "aerial_assault",
+    "name": "Aerial Assault",
+    "mp_cost": 20,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 2.0,
+    "ignore_def": 0.5,
+    "description": "A devastating leap attack that ignores 50% of defense."
+  },
+  "evasive_roll": {
+    "id": "evasive_roll",
+    "name": "Evasive Roll",
+    "mp_cost": 6,
+    "target": "self",
+    "type": "buff",
+    "effect": "evade",
+    "effect_duration": 1,
+    "description": "Dramatically increases evasion for one turn."
+  },
+  "pinwheel": {
+    "id": "pinwheel",
+    "name": "Pinwheel",
+    "mp_cost": 25,
+    "target": "all_enemies",
+    "type": "attack",
+    "power": 0.9,
+    "hits": 2,
+    "description": "Spins into all enemies twice. Each hit is separate."
+  },
+  "claw_swipe": {
+    "id": "claw_swipe",
+    "name": "Claw Swipe",
+    "mp_cost": 0,
+    "target": "single_ally",
+    "type": "attack",
+    "power": 1.0,
+    "description": "A standard claw attack."
+  },
+  "shadow_pounce": {
+    "id": "shadow_pounce",
+    "name": "Shadow Pounce",
+    "mp_cost": 15,
+    "target": "single_ally",
+    "type": "attack",
+    "power": 1.6,
+    "description": "Leaps from the shadows for heavy damage."
+  },
+  "arcane_burst": {
+    "id": "arcane_burst",
+    "name": "Arcane Burst",
+    "mp_cost": 18,
+    "target": "single_ally",
+    "type": "magic",
+    "power": 1.4,
+    "description": "Releases a burst of arcane energy."
+  },
+  "mystic_roar": {
+    "id": "mystic_roar",
+    "name": "Mystic Roar",
+    "mp_cost": 12,
+    "target": "all_allies",
+    "type": "debuff",
+    "effect": "spd_down",
+    "effect_duration": 2,
+    "description": "A roar that slows all party members."
+  },
+  "inferno_roar": {
+    "id": "inferno_roar",
+    "name": "Inferno Roar",
+    "mp_cost": 20,
+    "target": "all_allies",
+    "type": "attack",
+    "power": 1.1,
+    "description": "A fiery roar that damages the entire party."
+  },
+  "flame_claw": {
+    "id": "flame_claw",
+    "name": "Flame Claw",
+    "mp_cost": 10,
+    "target": "single_ally",
+    "type": "attack",
+    "power": 1.4,
+    "effect": "burn",
+    "effect_duration": 2,
+    "description": "Burns the target for 2 turns."
+  },
+  "lightning_strike": {
+    "id": "lightning_strike",
+    "name": "Lightning Strike",
+    "mp_cost": 14,
+    "target": "single_ally",
+    "type": "attack",
+    "power": 1.5,
+    "description": "A bolt of lightning. High speed."
+  },
+  "storm_dash": {
+    "id": "storm_dash",
+    "name": "Storm Dash",
+    "mp_cost": 8,
+    "target": "single_ally",
+    "type": "attack",
+    "power": 0.8,
+    "hits": 2,
+    "description": "Dashes through twice at high speed."
+  },
+  "frost_breath": {
+    "id": "frost_breath",
+    "name": "Frost Breath",
+    "mp_cost": 16,
+    "target": "single_ally",
+    "type": "attack",
+    "power": 1.2,
+    "effect": "freeze",
+    "effect_duration": 1,
+    "description": "May freeze the target solid for one turn."
+  },
+  "blizzard_roar": {
+    "id": "blizzard_roar",
+    "name": "Blizzard Roar",
+    "mp_cost": 22,
+    "target": "all_allies",
+    "type": "attack",
+    "power": 0.9,
+    "effect": "spd_down",
+    "effect_duration": 2,
+    "description": "Chills all party members, reducing their speed."
+  }
+}

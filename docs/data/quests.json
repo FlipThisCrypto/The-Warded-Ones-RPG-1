@@ -1,0 +1,38 @@
+[
+  {
+    "id": "trial_of_wards",
+    "title": "Trial of the Warded Grounds",
+    "description": "The Elder Ward has summoned you. The ancient guardian beasts have grown restless — only a proven Jester may claim the Ward Stone and restore balance.",
+    "stages": [
+      {
+        "id": "speak_elder",
+        "objective": "Speak with Elder Ward",
+        "description": "Find Elder Ward in the Warding Grounds.",
+        "trigger": "npc_elder_ward",
+        "complete": false
+      },
+      {
+        "id": "defeat_guardians",
+        "objective": "Defeat the Guardian Beasts (0/2)",
+        "description": "Battle through the guardian beasts that protect the Ward Stone.",
+        "trigger": "battle_victory",
+        "count": 2,
+        "current": 0,
+        "complete": false
+      },
+      {
+        "id": "claim_stone",
+        "objective": "Claim the Ward Stone",
+        "description": "Touch the Ward Stone at the center of the Grounds.",
+        "trigger": "interact_ward_stone",
+        "complete": false
+      }
+    ],
+    "rewards": {
+      "exp": 150,
+      "gold": 100,
+      "items": ["full_restore", "ward_shard"]
+    },
+    "complete": false
+  }
+]
