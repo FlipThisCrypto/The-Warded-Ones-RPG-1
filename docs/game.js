@@ -20,6 +20,7 @@ const STATE = {
   DEFEAT: 'DEFEAT',
   QUEST_COMPLETE: 'QUEST_COMPLETE',
   PAUSE: 'PAUSE',
+  JOURNAL: 'JOURNAL',
 };
 
 // ─── Main Game Class ──────────────────────────────────────────
@@ -173,6 +174,7 @@ class WardedOnesGame {
       case STATE.DEFEAT: if (this.battle) this.battle.renderDefeat(ctx, canvas); break;
       case STATE.QUEST_COMPLETE: this.ui.renderQuestComplete(ctx, canvas); break;
       case STATE.PAUSE: this.explore.render(ctx, canvas); this.ui.renderPause(ctx, canvas); break;
+      case STATE.JOURNAL: this.explore.render(ctx, canvas); this.ui.renderJournal(ctx, canvas); break;
     }
   }
 
@@ -665,6 +667,14 @@ class InputManager {
     if (g.state === STATE.EXPLORE) {
       if (e.code === 'Escape') { g.prevState = STATE.EXPLORE; g.state = STATE.PAUSE; }
       if (e.code === 'KeyF' || e.code === 'Enter') { g.explore.interact(); }
+      if (e.code === 'KeyJ') { g.state = STATE.JOURNAL; g.audio.playConfirm(); }
+    }
+
+    if (g.state === STATE.JOURNAL) {
+      if (e.code === 'Escape' || e.code === 'KeyJ' || e.code === 'Enter' || e.code === 'Space') {
+        g.state = STATE.EXPLORE;
+        g.audio.playCancel();
+      }
     }
 
     if (g.state === STATE.PAUSE) {
@@ -1012,6 +1022,57 @@ class UI {
     ctx.fillStyle = 'rgba(150,100,200,0.7)';
     ctx.textAlign = 'center';
     ctx.fillText(`⬡ ${objective}`, W / 2, by + boxH - 12);
+  }
+
+  renderJournal(ctx, canvas) {
+    const W = canvas.width, H = canvas.height;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(0, 0, W, H);
+
+    const boxW = 440, boxH = 340;
+    const bx = (W - boxW) / 2, by = (H - boxH) / 2;
+    drawRoundedRect(ctx, bx, by, boxW, boxH, 12, 'rgba(12, 6, 28, 0.95)', 'rgba(0, 240, 255, 0.5)', 2);
+
+    ctx.fillStyle = '#e0c0ff';
+    ctx.font = `bold 22px 'Cinzel', serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('QUEST JOURNAL', W / 2, by + 46);
+
+    const quests = this.game.quests || [];
+    ctx.textAlign = 'left';
+    
+    if (quests.length === 0) {
+      ctx.fillStyle = '#807090';
+      ctx.font = "14px Georgia";
+      ctx.fillText("No active quests.", bx + 40, by + 100);
+    } else {
+      quests.forEach((q, idx) => {
+        const qy = by + 90 + idx * 80;
+        const title = q.id === 'trial_of_wards' ? 'Trial of the Wards' : q.id;
+        
+        ctx.fillStyle = q.complete ? '#80ffcc' : '#f5e01d';
+        ctx.font = "bold 14px Cinzel, serif";
+        ctx.fillText(`${q.complete ? '✓' : '⬡'} ${title}`, bx + 40, qy);
+        
+        const activeStage = q.stages.find(s => !s.complete);
+        const objective = activeStage ? activeStage.objective : 'Quest Complete!';
+        
+        ctx.fillStyle = '#b0a0c0';
+        ctx.font = "12px Georgia";
+        ctx.fillText(objective, bx + 56, qy + 22);
+
+        const completedCount = q.stages.filter(s => s.complete).length;
+        const totalCount = q.stages.length;
+        ctx.fillStyle = '#605080';
+        ctx.font = "10px monospace";
+        ctx.fillText(`Stage Progress: ${completedCount}/${totalCount}`, bx + 56, qy + 40);
+      });
+    }
+
+    ctx.fillStyle = '#807090';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press J or ESC to close journal', W / 2, by + boxH - 20);
   }
 
   renderQuestComplete(ctx, canvas) {
