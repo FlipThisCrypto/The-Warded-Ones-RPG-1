@@ -403,7 +403,9 @@ class WardedOnesGame {
 
   // ─── New Game ─────────────────────────────────────────────
   startNewGame() {
-    this.party = this.data.characters.map(c => this.createPartyMember(c));
+    // Recruitable characters (charDef.recruit) join later via map NPCs.
+    this.party = this.data.characters.filter(c => !c.recruit)
+      .map(c => this.createPartyMember(c));
     this.inventory = [
       { id: 'healing_potion', quantity: 3 },
       { id: 'ether_orb', quantity: 2 },
@@ -1376,8 +1378,26 @@ class ExploreManager {
         radius: 20,
         dialogueKey: 'npc_elder_ward_first',
         talked: false,
+      },
+      {
+        id: 'verity_vex',
+        x: 120, y: 460,     // lower-left grounds, clear of platforms and encounter zones
+        label: 'Verity Vex',
+        color: '#e0b0ff',
+        radius: 20,
+        type: 'recruit',
+        recruitId: 'verity_vex',
+        dialogueKey: 'npc_verity_vex',
+        afterKey: 'npc_verity_vex_after',
       }
     ];
+    // A recruit NPC whose character is already in the party (loaded save)
+    // starts in the recruited state.
+    this.npcs.forEach(npc => {
+      if (npc.type === 'recruit' && this.game.party?.some(m => m.id === npc.recruitId)) {
+        npc.recruited = true;
+      }
+    });
 
     this.objects = [
       {
@@ -1549,6 +1569,23 @@ class ExploreManager {
       const dist = Math.hypot(this.playerX - npc.x, this.playerY - npc.y);
       if (dist < npc.radius + 40) {
         g.audio.playConfirm();
+        if (npc.type === 'recruit') {
+          if (!npc.recruited) {
+            g.startDialogue(npc.dialogueKey, () => {
+              npc.recruited = true;
+              const def = g.data.characters.find(c => c.id === npc.recruitId);
+              if (def && !g.party.some(m => m.id === def.id)) {
+                g.party.push(g.createPartyMember(def));
+                g.ui.showNotification(`${def.name} joined the party!`);
+                g.audio.playVictory();
+              }
+              g.state = STATE.EXPLORE;
+            });
+          } else {
+            g.startDialogue(npc.afterKey, () => { g.state = STATE.EXPLORE; });
+          }
+          return;
+        }
         if (!npc.talked) {
           npc.talked = true;
           this.elderTalked = true;

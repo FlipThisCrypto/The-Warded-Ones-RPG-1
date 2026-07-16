@@ -217,5 +217,44 @@
     "effect": "spd_down",
     "effect_duration": 2,
     "description": "Chills all party members, reducing their speed."
+  },
+  "truth_lash": {
+    "id": "truth_lash",
+    "name": "Truth Lash",
+    "mp_cost": 8,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.1,
+    "description": "A whip-crack of revealed truth. Reliable damage."
+  },
+  "piercing_gaze": {
+    "id": "piercing_gaze",
+    "name": "Piercing Gaze",
+    "mp_cost": 12,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 0.9,
+    "effect": "atk_down",
+    "effect_duration": 3,
+    "description": "A stare that unmakes confidence. Damages and lowers ATK for 3 turns."
+  },
+  "veil_of_lies": {
+    "id": "veil_of_lies",
+    "name": "Veil of Lies",
+    "mp_cost": 14,
+    "target": "single_ally",
+    "type": "buff",
+    "effect": "evade",
+    "effect_duration": 2,
+    "description": "Cloaks an ally in kind deception, granting evasion for 2 turns."
+  },
+  "revelation": {
+    "id": "revelation",
+    "name": "Revelation",
+    "mp_cost": 22,
+    "target": "all_enemies",
+    "type": "magic",
+    "power": 0.85,
+    "description": "The unbearable weight of truth crashes down on all foes."
   }
 }

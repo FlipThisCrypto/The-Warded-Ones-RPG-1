@@ -139,5 +139,34 @@
       "portrait": "assets/characters/gloam.png",
       "text": "Remember: I pull the strings. Even yours."
     }
+  ],
+  "npc_verity_vex": [
+    {
+      "speaker": "Verity Vex",
+      "portrait": "assets/characters/verity_vex.png",
+      "text": "Stop. Before you speak — yes, I know why you are here. I see every thread of it."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "Then you know we could use a seer. The guardians grow restless and the Ward Stone stirs."
+    },
+    {
+      "speaker": "Verity Vex",
+      "portrait": "assets/characters/verity_vex.png",
+      "text": "I know something worse: what happens if I refuse. Very well, jester. My eyes are yours."
+    },
+    {
+      "speaker": "Verity Vex",
+      "portrait": "assets/characters/verity_vex.png",
+      "text": "Verity Vex joins the party!"
+    }
+  ],
+  "npc_verity_vex_after": [
+    {
+      "speaker": "Verity Vex",
+      "portrait": "assets/characters/verity_vex.png",
+      "text": "Walk on. The future does not wait, and neither should we."
+    }
   ]
 }

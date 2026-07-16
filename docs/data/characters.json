@@ -55,5 +55,25 @@
     "description": "The fastest of the jesters, Tess strikes before enemies can react. Low defense but devastating offensive output.",
     "battle_quote": "Try to keep up!",
     "victory_quote": "Speed is everything."
+  },
+  {
+    "id": "verity_vex",
+    "name": "Verity Vex",
+    "title": "The Truthseer",
+    "class": "Truthseer",
+    "recruit": true,
+    "portrait": "assets/characters/verity_vex.png",
+    "stats": {
+      "hp": 118, "mp": 115,
+      "atk": 21, "def": 13, "spd": 20, "lck": 16
+    },
+    "growth": {
+      "hp": 13, "mp": 14,
+      "atk": 3, "def": 2, "spd": 2, "lck": 2
+    },
+    "abilities": ["truth_lash", "piercing_gaze", "veil_of_lies", "revelation"],
+    "description": "A seer who weaponizes honesty. Her gaze strips foes of their strength while her veils shield allies in kind deception.",
+    "battle_quote": "The truth hurts. Allow me to demonstrate.",
+    "victory_quote": "You were never going to win. I saw it."
   }
 ]
