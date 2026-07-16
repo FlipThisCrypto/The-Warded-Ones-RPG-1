@@ -1389,6 +1389,17 @@ class ExploreManager {
         recruitId: 'verity_vex',
         dialogueKey: 'npc_verity_vex',
         afterKey: 'npc_verity_vex_after',
+      },
+      {
+        id: 'cogsworth',
+        x: 835, y: 320,     // east wall sentinel post, below the stone pedestal
+        label: 'Cogsworth',
+        color: '#f0c060',
+        radius: 20,
+        type: 'recruit',
+        recruitId: 'cogsworth',
+        dialogueKey: 'npc_cogsworth',
+        afterKey: 'npc_cogsworth_after',
       }
     ];
     // A recruit NPC whose character is already in the party (loaded save)

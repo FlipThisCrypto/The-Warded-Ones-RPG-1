@@ -256,5 +256,46 @@
     "type": "magic",
     "power": 0.85,
     "description": "The unbearable weight of truth crashes down on all foes."
+  },
+  "gear_smash": {
+    "id": "gear_smash",
+    "name": "Gear Smash",
+    "mp_cost": 9,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.2,
+    "description": "A pendulum-weight blow. Slow, heavy, honest damage."
+  },
+  "wind_up": {
+    "id": "wind_up",
+    "name": "Wind-Up Strike",
+    "mp_cost": 14,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 0.8,
+    "effect": "spd_down",
+    "effect_duration": 3,
+    "description": "Catches a foe in grinding gears, slowing them for 3 turns."
+  },
+  "clockwork_aegis": {
+    "id": "clockwork_aegis",
+    "name": "Clockwork Aegis",
+    "mp_cost": 15,
+    "target": "single_ally",
+    "type": "buff",
+    "effect": "evade",
+    "effect_duration": 2,
+    "description": "Interposing brass plates let an ally slip the next blows."
+  },
+  "overclock": {
+    "id": "overclock",
+    "name": "Overclock",
+    "mp_cost": 20,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.6,
+    "effect": "burn",
+    "effect_duration": 2,
+    "description": "Redlines the boiler for a scorching overdriven strike."
   }
 }

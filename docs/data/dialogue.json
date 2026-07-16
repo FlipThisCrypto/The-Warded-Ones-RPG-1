@@ -168,5 +168,34 @@
       "portrait": "assets/characters/verity_vex.png",
       "text": "Walk on. The future does not wait, and neither should we."
     }
+  ],
+  "npc_cogsworth": [
+    {
+      "speaker": "Cogsworth",
+      "portrait": "assets/characters/cogsworth.png",
+      "text": "Tick. Tock. A visitor. I have stood this watch for four hundred years, give or take a mainspring."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "Four hundred years? The guardians are loose NOW, friend. We could use a shield that never sleeps."
+    },
+    {
+      "speaker": "Cogsworth",
+      "portrait": "assets/characters/cogsworth.png",
+      "text": "A new commission... very well. Winding complete. Warden protocol engaged."
+    },
+    {
+      "speaker": "Cogsworth",
+      "portrait": "assets/characters/cogsworth.png",
+      "text": "Cogsworth joins the party!"
+    }
+  ],
+  "npc_cogsworth_after": [
+    {
+      "speaker": "Cogsworth",
+      "portrait": "assets/characters/cogsworth.png",
+      "text": "All gears nominal. Point me at whatever needs outlasting."
+    }
   ]
 }

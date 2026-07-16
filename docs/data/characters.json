@@ -6,14 +6,27 @@
     "class": "Trickster",
     "portrait": "assets/characters/motley_max.png",
     "stats": {
-      "hp": 140, "mp": 90,
-      "atk": 28, "def": 14, "spd": 22, "lck": 18
+      "hp": 140,
+      "mp": 90,
+      "atk": 28,
+      "def": 14,
+      "spd": 22,
+      "lck": 18
     },
     "growth": {
-      "hp": 18, "mp": 10,
-      "atk": 4, "def": 2, "spd": 3, "lck": 3
+      "hp": 18,
+      "mp": 10,
+      "atk": 4,
+      "def": 2,
+      "spd": 3,
+      "lck": 3
     },
-    "abilities": ["jester_gambit", "shuffle", "healing_jig", "wild_card"],
+    "abilities": [
+      "jester_gambit",
+      "shuffle",
+      "healing_jig",
+      "wild_card"
+    ],
     "description": "A chaotic jester whose tricks can swing between brilliant and catastrophic. High luck amplifies his unpredictable power.",
     "battle_quote": "Let the games begin!",
     "victory_quote": "Was there ever any doubt?"
@@ -25,14 +38,27 @@
     "class": "Shadow Mage",
     "portrait": "assets/characters/gloam.png",
     "stats": {
-      "hp": 110, "mp": 130,
-      "atk": 18, "def": 12, "spd": 19, "lck": 10
+      "hp": 110,
+      "mp": 130,
+      "atk": 18,
+      "def": 12,
+      "spd": 19,
+      "lck": 10
     },
     "growth": {
-      "hp": 12, "mp": 16,
-      "atk": 2, "def": 2, "spd": 2, "lck": 1
+      "hp": 12,
+      "mp": 16,
+      "atk": 2,
+      "def": 2,
+      "spd": 2,
+      "lck": 1
     },
-    "abilities": ["puppet_strike", "shadow_web", "void_drain", "marionette"],
+    "abilities": [
+      "puppet_strike",
+      "shadow_web",
+      "void_drain",
+      "marionette"
+    ],
     "description": "A master of shadow puppetry who controls enemies from afar. Excels at weakening foes before finishing them.",
     "battle_quote": "Dance for me...",
     "victory_quote": "Your strings were always mine to pull."
@@ -44,14 +70,27 @@
     "class": "Acrobat",
     "portrait": "assets/characters/tumbling_tess.png",
     "stats": {
-      "hp": 125, "mp": 70,
-      "atk": 32, "def": 10, "spd": 28, "lck": 14
+      "hp": 125,
+      "mp": 70,
+      "atk": 32,
+      "def": 10,
+      "spd": 28,
+      "lck": 14
     },
     "growth": {
-      "hp": 15, "mp": 8,
-      "atk": 5, "def": 1, "spd": 4, "lck": 2
+      "hp": 15,
+      "mp": 8,
+      "atk": 5,
+      "def": 1,
+      "spd": 4,
+      "lck": 2
     },
-    "abilities": ["acrobatic_strike", "aerial_assault", "evasive_roll", "pinwheel"],
+    "abilities": [
+      "acrobatic_strike",
+      "aerial_assault",
+      "evasive_roll",
+      "pinwheel"
+    ],
     "description": "The fastest of the jesters, Tess strikes before enemies can react. Low defense but devastating offensive output.",
     "battle_quote": "Try to keep up!",
     "victory_quote": "Speed is everything."
@@ -64,16 +103,62 @@
     "recruit": true,
     "portrait": "assets/characters/verity_vex.png",
     "stats": {
-      "hp": 118, "mp": 115,
-      "atk": 21, "def": 13, "spd": 20, "lck": 16
+      "hp": 118,
+      "mp": 115,
+      "atk": 21,
+      "def": 13,
+      "spd": 20,
+      "lck": 16
     },
     "growth": {
-      "hp": 13, "mp": 14,
-      "atk": 3, "def": 2, "spd": 2, "lck": 2
+      "hp": 13,
+      "mp": 14,
+      "atk": 3,
+      "def": 2,
+      "spd": 2,
+      "lck": 2
     },
-    "abilities": ["truth_lash", "piercing_gaze", "veil_of_lies", "revelation"],
+    "abilities": [
+      "truth_lash",
+      "piercing_gaze",
+      "veil_of_lies",
+      "revelation"
+    ],
     "description": "A seer who weaponizes honesty. Her gaze strips foes of their strength while her veils shield allies in kind deception.",
     "battle_quote": "The truth hurts. Allow me to demonstrate.",
     "victory_quote": "You were never going to win. I saw it."
+  },
+  {
+    "id": "cogsworth",
+    "name": "Cogsworth",
+    "title": "The Clockwork Jester",
+    "class": "Warden",
+    "recruit": true,
+    "portrait": "assets/characters/cogsworth.png",
+    "stats": {
+      "hp": 170,
+      "mp": 80,
+      "atk": 22,
+      "def": 24,
+      "spd": 12,
+      "lck": 8
+    },
+    "growth": {
+      "hp": 22,
+      "mp": 8,
+      "atk": 3,
+      "def": 4,
+      "spd": 1,
+      "lck": 1
+    },
+    "abilities": [
+      "gear_smash",
+      "wind_up",
+      "clockwork_aegis",
+      "overclock"
+    ],
+    "description": "A ticking construct of brass and stubbornness. Slow to act, nearly impossible to put down, and the wall the others hide behind.",
+    "battle_quote": "Tick. Tock. Your time is up.",
+    "victory_quote": "Right on schedule."
   }
 ]
