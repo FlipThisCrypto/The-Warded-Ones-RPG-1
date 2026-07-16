@@ -3311,6 +3311,34 @@ class BattleManager {
         ctx.drawImage(portrait, px, py, pSize, pSize);
         ctx.restore();
 
+        // KO stamp overlay
+        if (m.currentHp <= 0) {
+          ctx.save();
+          ctx.translate(mlox + mhbx, mloy + mhby);
+          ctx.fillStyle = 'rgba(100, 0, 0, 0.55)';
+          ctx.fillRect(px, py, pSize, pSize);
+          ctx.strokeStyle = '#ff3333';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px + 4, py + 4, pSize - 8, pSize - 8);
+          ctx.fillStyle = '#ffb3b3';
+          ctx.font = 'bold 16px Cinzel, serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('KO', px + pSize/2, py + pSize/2 + 6);
+          ctx.restore();
+        }
+
+        // Low HP warning border
+        const hpRatio = m.currentHp / m.stats.hp;
+        if (hpRatio > 0 && hpRatio < 0.3) {
+          ctx.save();
+          ctx.translate(mlox + mhbx, mloy + mhby);
+          const pulse = 0.4 + Math.sin(this.animTimer * 10) * 0.4;
+          ctx.strokeStyle = `rgba(255, 0, 60, ${pulse})`;
+          ctx.lineWidth = 3;
+          ctx.strokeRect(px - 1, py - 1, pSize + 2, pSize + 2);
+          ctx.restore();
+        }
+
         // Flash and slash overlays for player characters
         const flashIntensity = this.hitFlashes[mid] || 0;
         if (flashIntensity > 0) {
@@ -3332,8 +3360,8 @@ class BattleManager {
         }
       }
 
-      // Highlight current
-      if (isCurrent) {
+      // Highlight current (when active and not KO'd)
+      if (isCurrent && m.currentHp > 0) {
         ctx.strokeStyle = '#f0c060';
         ctx.lineWidth = 2;
         ctx.strokeRect(px - 1, py - 1, pSize + 2, pSize + 2);
