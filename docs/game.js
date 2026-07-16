@@ -2234,6 +2234,7 @@ class BattleManager {
     this.hitFlashes = {};          // id → flash intensity 0–1
     this.actionAnnounce = null;    // { text, timer, maxTimer, color }
     this.victoryParticles = [];    // burst on win
+    this.battleParticles = [];     // cast/hit particle systems
     this.enemyPositions = [];      // set each render frame, used by fx spawners
     this.partyPositions = [];
     this.lungeOffsets = {};        // id → { dx, dy, life 0→1 }
@@ -2460,8 +2461,18 @@ class BattleManager {
     this.shakeX = shakeMag;
     this.shakeY = shakeMag * 0.5;
 
-    // Hit flash + bounce on target
-    this.spawnHitFlash(target.id || target.name);
+    // Determine particle color by ability metadata
+    let hitColor = '#ffaa33';
+    if (abilityDef.id?.includes('fire') || abilityDef.id?.includes('blaze') || abilityDef.effect?.includes('burn')) {
+      hitColor = '#ff5500';
+    } else if (abilityDef.id?.includes('ice') || abilityDef.id?.includes('frost') || abilityDef.effect?.includes('freeze')) {
+      hitColor = '#00f0ff';
+    } else if (abilityDef.effect === 'heal' || abilityDef.effect === 'heal_mp') {
+      hitColor = '#80ff80';
+    } else if (abilityDef.id?.includes('gambit') || abilityDef.effect === 'random_power') {
+      hitColor = '#ff00ff';
+    }
+    this.spawnHitFlash(target.id || target.name, hitColor);
 
     // Lunge: actor charges toward target
     const actorId = actor.id || actor.name;
@@ -2527,10 +2538,33 @@ class BattleManager {
     });
   }
 
-  spawnHitFlash(targetId) {
+  spawnBattleParticles(x, y, color = '#ffbb33', count = 18) {
+    const colors = Array.isArray(color) ? color : [color, '#ffffff', '#ff6633'];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * 150;
+      this.battleParticles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 0.4 + Math.random() * 0.4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: 2 + Math.random() * 4,
+      });
+    }
+  }
+
+  spawnHitFlash(targetId, color = '#ffaa33') {
     this.hitFlashes[targetId] = 1.0;
-    // Hit bounce — target jerks back from the impact direction
     this.hitBounces[targetId] = { dx: 14, dy: -6, life: 1.0 };
+
+    // Spawn hit particles at the center of the target portrait
+    const targetPos = this.enemyPositions.find(p => p.id === targetId) || 
+                      this.partyPositions.find(p => p.id === targetId);
+    if (targetPos) {
+      this.spawnBattleParticles(targetPos.x, targetPos.y, color, 20);
+    }
   }
 
   spawnLunge(actorId, dx, dy) {
@@ -2584,6 +2618,15 @@ class BattleManager {
       this.actionAnnounce.timer -= dt;
       if (this.actionAnnounce.timer <= 0) this.actionAnnounce = null;
     }
+
+    // Battle particles decay and movement
+    this.battleParticles = this.battleParticles.filter(p => {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 60 * dt; // gravity
+      p.life -= dt * 2.0;
+      return p.life > 0;
+    });
 
     // Victory particles
     this.victoryParticles = this.victoryParticles.filter(p => {
@@ -2660,6 +2703,17 @@ class BattleManager {
       ctx.fillText(a.text, canvas.width / 2, canvas.height * 0.44);
       ctx.restore();
     }
+
+    // Battle particles
+    this.battleParticles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
 
     // Victory particles
     this.victoryParticles.forEach(p => {
