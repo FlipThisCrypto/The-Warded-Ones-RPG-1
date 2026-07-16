@@ -2573,9 +2573,14 @@ class BattleManager {
     if (!alive.length) { this.checkBattleEnd(); return; }
 
     const ability = this.chooseEnemyAbility(enemy);
-    const target = alive[Math.floor(Math.random() * alive.length)];
+    // AoE abilities (target: all_enemies) hit the whole living party;
+    // everything else picks one random living member.
+    const abilityDef = this.game.getAbilityDef(ability);
+    const targets = abilityDef && abilityDef.target === 'all_enemies'
+      ? alive
+      : [alive[Math.floor(Math.random() * alive.length)]];
 
-    this.executeAbility(enemy, [target], ability, false);
+    this.executeAbility(enemy, targets, ability, false);
     this.checkBattleEnd();
 
     setTimeout(() => {

@@ -337,5 +337,36 @@
     "power": 1.4,
     "effect": "random_power",
     "description": "Declares the duel already won. Luck decides how emphatically."
+  },
+  "starfall_pounce": {
+    "id": "starfall_pounce",
+    "name": "Starfall Pounce",
+    "mp_cost": 18,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.5,
+    "description": "Drops from the night sky itself onto a single target."
+  },
+  "void_howl": {
+    "id": "void_howl",
+    "name": "Void Howl",
+    "mp_cost": 24,
+    "target": "all_enemies",
+    "type": "attack",
+    "power": 0.7,
+    "effect": "spd_down",
+    "effect_duration": 2,
+    "description": "A howl from between the stars that slows all who hear it."
+  },
+  "comet_claw": {
+    "id": "comet_claw",
+    "name": "Comet Claw",
+    "mp_cost": 14,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.1,
+    "effect": "burn",
+    "effect_duration": 2,
+    "description": "A burning arc of claw-light that leaves stellar fire behind."
   }
 }

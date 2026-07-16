@@ -226,5 +226,21 @@
       "portrait": "assets/characters/sir_paradox.png",
       "text": "Onward! Or backward. In my experience they arrive at the same place."
     }
+  ],
+  "battle_intro_cougar": [
+    {
+      "speaker": "???",
+      "text": "The stars over the Warding Grounds begin to wheel and blur..."
+    },
+    {
+      "speaker": "Astral Cougar",
+      "portrait": "assets/enemies/astral_cougar.png",
+      "text": "A low growl rolls out of the constellations themselves. The Astral Cougar descends, starlight dripping from its claws."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "Everyone - TOGETHER!"
+    }
   ]
 }

@@ -5,11 +5,24 @@
     "type": "Guardian",
     "portrait": "assets/enemies/abyss_tiger.png",
     "stats": {
-      "hp": 80, "mp": 30,
-      "atk": 24, "def": 12, "spd": 16, "lck": 6
+      "hp": 80,
+      "mp": 30,
+      "atk": 24,
+      "def": 12,
+      "spd": 16,
+      "lck": 6
     },
-    "abilities": ["claw_swipe", "shadow_pounce"],
-    "rewards": { "exp": 45, "gold": 30, "items": ["ward_shard"] },
+    "abilities": [
+      "claw_swipe",
+      "shadow_pounce"
+    ],
+    "rewards": {
+      "exp": 45,
+      "gold": 30,
+      "items": [
+        "ward_shard"
+      ]
+    },
     "description": "A tiger wreathed in abyssal energy. Strikes hard but predictably.",
     "ai": "aggressive"
   },
@@ -19,11 +32,25 @@
     "type": "Spellweaver",
     "portrait": "assets/enemies/arcane_leopard.png",
     "stats": {
-      "hp": 70, "mp": 60,
-      "atk": 18, "def": 10, "spd": 20, "lck": 10
+      "hp": 70,
+      "mp": 60,
+      "atk": 18,
+      "def": 10,
+      "spd": 20,
+      "lck": 10
     },
-    "abilities": ["arcane_burst", "claw_swipe", "mystic_roar"],
-    "rewards": { "exp": 55, "gold": 40, "items": ["ether_orb"] },
+    "abilities": [
+      "arcane_burst",
+      "claw_swipe",
+      "mystic_roar"
+    ],
+    "rewards": {
+      "exp": 55,
+      "gold": 40,
+      "items": [
+        "ether_orb"
+      ]
+    },
     "description": "A leopard imbued with arcane magic. Prefers spells over claws.",
     "ai": "balanced"
   },
@@ -33,11 +60,26 @@
     "type": "Inferno",
     "portrait": "assets/enemies/blaze_lion.png",
     "stats": {
-      "hp": 110, "mp": 40,
-      "atk": 30, "def": 16, "spd": 14, "lck": 8
+      "hp": 110,
+      "mp": 40,
+      "atk": 30,
+      "def": 16,
+      "spd": 14,
+      "lck": 8
     },
-    "abilities": ["inferno_roar", "flame_claw", "claw_swipe"],
-    "rewards": { "exp": 80, "gold": 60, "items": ["healing_potion", "ward_shard"] },
+    "abilities": [
+      "inferno_roar",
+      "flame_claw",
+      "claw_swipe"
+    ],
+    "rewards": {
+      "exp": 80,
+      "gold": 60,
+      "items": [
+        "healing_potion",
+        "ward_shard"
+      ]
+    },
     "description": "The alpha guardian of the Warding Grounds. Commands fire and brute strength.",
     "ai": "aggressive"
   },
@@ -47,11 +89,23 @@
     "type": "Storm",
     "portrait": "assets/enemies/azure_tiger.png",
     "stats": {
-      "hp": 65, "mp": 45,
-      "atk": 20, "def": 8, "spd": 24, "lck": 12
+      "hp": 65,
+      "mp": 45,
+      "atk": 20,
+      "def": 8,
+      "spd": 24,
+      "lck": 12
     },
-    "abilities": ["lightning_strike", "claw_swipe", "storm_dash"],
-    "rewards": { "exp": 50, "gold": 35, "items": [] },
+    "abilities": [
+      "lightning_strike",
+      "claw_swipe",
+      "storm_dash"
+    ],
+    "rewards": {
+      "exp": 50,
+      "gold": 35,
+      "items": []
+    },
     "description": "A swift tiger crackling with storm energy. Hard to hit.",
     "ai": "swift"
   },
@@ -61,12 +115,57 @@
     "type": "Frost",
     "portrait": "assets/enemies/arctic_lion.png",
     "stats": {
-      "hp": 90, "mp": 50,
-      "atk": 22, "def": 20, "spd": 12, "lck": 6
+      "hp": 90,
+      "mp": 50,
+      "atk": 22,
+      "def": 20,
+      "spd": 12,
+      "lck": 6
     },
-    "abilities": ["frost_breath", "claw_swipe", "blizzard_roar"],
-    "rewards": { "exp": 60, "gold": 45, "items": ["ether_orb"] },
+    "abilities": [
+      "frost_breath",
+      "claw_swipe",
+      "blizzard_roar"
+    ],
+    "rewards": {
+      "exp": 60,
+      "gold": 45,
+      "items": [
+        "ether_orb"
+      ]
+    },
     "description": "A lion encased in frost. Slow but heavily armored.",
     "ai": "defensive"
+  },
+  {
+    "id": "astral_cougar",
+    "name": "Astral Cougar",
+    "type": "Celestial",
+    "boss": true,
+    "portrait": "assets/enemies/astral_cougar.png",
+    "stats": {
+      "hp": 320,
+      "mp": 120,
+      "atk": 34,
+      "def": 20,
+      "spd": 24,
+      "lck": 16
+    },
+    "abilities": [
+      "starfall_pounce",
+      "void_howl",
+      "comet_claw",
+      "claw_swipe"
+    ],
+    "rewards": {
+      "exp": 260,
+      "gold": 220,
+      "items": [
+        "full_restore",
+        "revive_shard"
+      ]
+    },
+    "description": "A guardian that walks between constellations. The stars themselves sharpen its claws.",
+    "ai": "aggressive"
   }
 ]
