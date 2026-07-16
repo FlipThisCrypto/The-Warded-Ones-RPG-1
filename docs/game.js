@@ -93,10 +93,23 @@ class WardedOnesGame {
     this.totalImages = imageList.length;
     await this.preloadImages(imageList);
 
-    this.saveExists = !!localStorage.getItem(SAVE_KEY);
+    const rawSave = localStorage.getItem(SAVE_KEY);
+    this.saveExists = !!rawSave;
+    this.saveMeta = null;
+    if (rawSave) {
+      try {
+        const sd = JSON.parse(rawSave);
+        const mins = Math.floor((sd.playtime || 0) / 60);
+        const d = new Date(sd.timestamp || 0);
+        const dateStr = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const lv = sd.party?.[0]?.level ?? 1;
+        this.saveMeta = `Lv.${lv}  ${mins}m  ${dateStr}`;
+      } catch(e) {}
+    }
     this.state = STATE.TITLE;
     this.ui = new UI(this);
     this.explore = new ExploreManager(this);
+    this.audio.playExploreMusic(); // theme plays from title screen
     this.requestFrame();
   }
 
@@ -230,7 +243,7 @@ class WardedOnesGame {
     // Menu items
     const menuItems = [
       { label: '▶  NEW GAME', y: H * 0.48, action: 'new_game' },
-      { label: this.saveExists ? '◈  CONTINUE' : '○  CONTINUE', y: H * 0.56, action: 'continue', disabled: !this.saveExists },
+      { label: this.saveExists ? '◈  CONTINUE' : '○  CONTINUE', y: H * 0.56, action: 'continue', disabled: !this.saveExists, sub: this.saveMeta },
       { label: '⚙  SETTINGS', y: H * 0.64, action: 'settings' },
     ];
 
@@ -251,6 +264,46 @@ class WardedOnesGame {
       ctx.textAlign = 'center';
       ctx.fillText(item.label, W / 2, item.y);
       ctx.shadowBlur = 0;
+      if (item.sub) {
+        ctx.font = `${Math.floor(W * 0.013)}px monospace`;
+        ctx.fillStyle = selected ? 'rgba(240,192,80,0.6)' : 'rgba(160,110,200,0.5)';
+        ctx.fillText(item.sub, W / 2, item.y + 18);
+      }
+    });
+
+    // Party portraits row — bottom left, silhouetted and glowing
+    const partyPortraits = [
+      { key: 'assets/characters/motley_max.png',    name: 'Motley Max',    role: 'Trickster' },
+      { key: 'assets/characters/gloam.png',         name: 'Gloam',         role: 'Shadow Mage' },
+      { key: 'assets/characters/tumbling_tess.png', name: 'Tumbling Tess', role: 'Acrobat' },
+    ];
+    const pSize = 80;
+    const pY = H * 0.70;
+    partyPortraits.forEach((p, i) => {
+      const px = W * 0.08 + i * (pSize + 24);
+      const img = this.images[p.key];
+      if (img) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 + this.titleGlow * 0.25;
+        ctx.shadowColor = 'rgba(160,80,255,0.5)';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.roundRect(px, pY, pSize, pSize, 6);
+        ctx.clip();
+        ctx.drawImage(img, px, pY, pSize, pSize);
+        ctx.restore();
+        // Border glow
+        ctx.strokeStyle = `rgba(160,80,255,${0.3 + this.titleGlow * 0.3})`;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(px, pY, pSize, pSize);
+      }
+      ctx.fillStyle = `rgba(200,160,255,${0.6 + this.titleGlow * 0.2})`;
+      ctx.font = 'bold 10px Cinzel, serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(p.name, px, pY + pSize + 14);
+      ctx.fillStyle = 'rgba(140,90,200,0.7)';
+      ctx.font = '9px Georgia, serif';
+      ctx.fillText(p.role, px, pY + pSize + 26);
     });
 
     // Version and studio tag
@@ -570,8 +623,28 @@ class InputManager {
     }
 
     if (g.state === STATE.PAUSE) {
+      const audio = g.audio;
+      // Items: 0=Resume, 1=Save, 2=MainMenu; 3=MusicVol, 4=SfxVol
       if (e.code === 'Escape') { g.state = STATE.EXPLORE; }
-      if (e.code === 'KeyS') { g.save(); ui.showNotification('Game saved!'); g.state = STATE.EXPLORE; }
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        ui.pauseSelection = (ui.pauseSelection - 1 + 5) % 5;
+      }
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+        ui.pauseSelection = (ui.pauseSelection + 1) % 5;
+      }
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        if (ui.pauseSelection === 3) { audio.musicVol = Math.max(0, audio.musicVol - 0.1); if (audio._audioEl) audio._audioEl.volume = audio.musicVol * audio.masterVol; }
+        if (ui.pauseSelection === 4) audio.sfxVol = Math.max(0, audio.sfxVol - 0.1);
+      }
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        if (ui.pauseSelection === 3) { audio.musicVol = Math.min(1, audio.musicVol + 0.1); if (audio._audioEl) audio._audioEl.volume = audio.musicVol * audio.masterVol; }
+        if (ui.pauseSelection === 4) audio.sfxVol = Math.min(1, audio.sfxVol + 0.1);
+      }
+      if (e.code === 'Enter' || e.code === 'KeyZ' || e.code === 'KeyF') {
+        if (ui.pauseSelection === 0) { g.state = STATE.EXPLORE; }
+        if (ui.pauseSelection === 1) { g.save(); ui.showNotification('Game saved!'); g.state = STATE.EXPLORE; }
+        if (ui.pauseSelection === 2) { g.state = STATE.TITLE; g.audio.playExploreMusic(); }
+      }
     }
 
     if (g.state === STATE.BATTLE && g.battle) {
@@ -780,7 +853,7 @@ class UI {
     this.notification = null;
     this.notifTimer = 0;
     this.pauseSelection = 0;
-    this.pauseItems = ['Resume', 'Save Game', 'Settings', 'Main Menu'];
+    this.pauseItems = ['Resume', 'Save Game', 'Main Menu', 'Music Vol', 'SFX Vol'];
   }
 
   confirmTitleSelection() {
@@ -821,34 +894,75 @@ class UI {
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(0, 0, W, H);
 
-    const boxW = 320, boxH = 320;
+    const boxW = 340, boxH = 400;
     const bx = (W - boxW) / 2, by = (H - boxH) / 2;
     drawRoundedRect(ctx, bx, by, boxW, boxH, 12, 'rgba(10,5,30,0.95)', 'rgba(150,80,255,0.8)', 2);
 
     ctx.fillStyle = '#e0c0ff';
     ctx.font = `bold 22px 'Cinzel', serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('PAUSED', W / 2, by + 50);
+    ctx.fillText('PAUSED', W / 2, by + 46);
 
-    this.pauseItems.forEach((label, i) => {
-      const y = by + 100 + i * 52;
+    // Menu items (skip Settings — replaced by inline sliders)
+    const items = ['Resume', 'Save Game', 'Main Menu'];
+    items.forEach((label, i) => {
+      const y = by + 92 + i * 46;
       const selected = this.pauseSelection === i;
       if (selected) {
         ctx.fillStyle = 'rgba(100,40,160,0.6)';
-        ctx.fillRect(bx + 20, y - 28, boxW - 40, 44);
+        ctx.fillRect(bx + 20, y - 24, boxW - 40, 36);
       }
       ctx.fillStyle = selected ? '#f0c060' : '#c090e0';
-      ctx.font = `${selected ? 'bold' : ''} 18px 'Cinzel', serif`;
+      ctx.font = `${selected ? 'bold' : ''} 16px 'Cinzel', serif`;
       ctx.textAlign = 'center';
       ctx.fillText(label, W / 2, y);
     });
 
+    // ── Volume sliders ─────────────────────────────
+    const audio = this.game.audio;
+    const sliderY = by + 240, sliderX = bx + 30, sliderW = boxW - 60;
+
+    const drawSlider = (label, value, y) => {
+      ctx.fillStyle = '#a080c0';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, sliderX, y - 2);
+      ctx.fillStyle = '#201030';
+      ctx.fillRect(sliderX, y + 4, sliderW, 8);
+      ctx.fillStyle = '#8050d0';
+      ctx.fillRect(sliderX, y + 4, sliderW * value, 8);
+      ctx.fillStyle = '#d0a0ff';
+      ctx.beginPath();
+      ctx.arc(sliderX + sliderW * value, y + 8, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c0a0e0';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(value * 100) + '%', bx + boxW - 20, y - 2);
+    };
+
+    ctx.strokeStyle = 'rgba(100,60,160,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bx + 20, by + 228); ctx.lineTo(bx + boxW - 20, by + 228); ctx.stroke();
+    ctx.fillStyle = '#8060a0';
+    ctx.font = 'bold 11px Cinzel, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('VOLUME', W / 2, by + 242);
+
+    drawSlider('Music', audio.musicVol, sliderY + 12);
+    drawSlider('SFX  ', audio.sfxVol,   sliderY + 52);
+
+    ctx.fillStyle = '#504060';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('← → adjust  (while paused, Up/Down select)', W / 2, by + boxH - 30);
+
     const g = this.game;
     const objective = g.getQuestObjective('trial_of_wards');
-    ctx.font = '13px Georgia, serif';
-    ctx.fillStyle = 'rgba(150,100,200,0.8)';
+    ctx.font = '12px Georgia, serif';
+    ctx.fillStyle = 'rgba(150,100,200,0.7)';
     ctx.textAlign = 'center';
-    ctx.fillText(`⬡ ${objective}`, W / 2, by + boxH - 20);
+    ctx.fillText(`⬡ ${objective}`, W / 2, by + boxH - 12);
   }
 
   renderQuestComplete(ctx, canvas) {
@@ -909,14 +1023,25 @@ class UI {
     if (!this.game.party.length) return;
     const W = canvas.width;
 
-    // Quest objective
-    const obj = this.game.getQuestObjective('trial_of_wards');
-    ctx.font = '12px Georgia, serif';
+    // Quest progress panel
+    const quest = this.game.quests?.find(q => q.id === 'trial_of_wards');
+    const stage = quest?.stages?.find(s => !s.complete);
+    const obj = stage ? stage.objective : '✦ Quest Complete!';
+    const doneCount = quest?.stages?.filter(s => s.complete).length ?? 0;
+    const totalCount = quest?.stages?.length ?? 0;
+    const panelW = Math.min(Math.max(obj.length * 7 + 60, 220), 420);
+    ctx.fillStyle = 'rgba(0,0,0,0.58)';
+    ctx.fillRect(8, 8, panelW, 38);
+    ctx.strokeStyle = 'rgba(120,60,200,0.45)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(8, 8, panelW, 38);
+    ctx.font = 'bold 10px Cinzel, serif';
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(8, 8, Math.min(obj.length * 7.5 + 20, 400), 26);
-    ctx.fillStyle = '#e0c0ff';
-    ctx.fillText('⬡ ' + obj, 16, 25);
+    ctx.fillStyle = 'rgba(150,80,255,0.9)';
+    ctx.fillText(`JESTER'S TRIAL  ${doneCount}/${totalCount}`, 16, 21);
+    ctx.font = '11px Georgia, serif';
+    ctx.fillStyle = '#d0b0ff';
+    ctx.fillText('⬡ ' + obj, 16, 37);
 
     // Notification
     if (this.notification && this.notifTimer > 0) {
@@ -1035,8 +1160,8 @@ class DialogueManager {
 class ExploreManager {
   constructor(game) {
     this.game = game;
-    this.playerX = 400;
-    this.playerY = 300;
+    this.playerX = 300;
+    this.playerY = 260;
     this.playerDir = 'down';
     this.playerAnim = 0;
     this.animTimer = 0;
@@ -1048,7 +1173,7 @@ class ExploreManager {
     this.npcs = [
       {
         id: 'elder_ward',
-        x: 250, y: 180,
+        x: 148, y: 170,     // center of the Elder's Alcove platform (x:60-240, y:118-218)
         label: 'Elder Ward',
         color: '#80d0ff',
         radius: 20,
@@ -1060,7 +1185,7 @@ class ExploreManager {
     this.objects = [
       {
         id: 'ward_stone',
-        x: 680, y: 200,
+        x: 720, y: 148,     // top center of the stone pedestal (x:680-760, y:120-205)
         label: 'Ward Stone',
         color: '#d0a0ff',
         radius: 25,
@@ -1069,8 +1194,8 @@ class ExploreManager {
     ];
 
     this.encounter_zones = [
-      { x: 400, y: 400, r: 80, enemy: ['abyss_tiger'], bg: 'battle_bg', used: false },
-      { x: 550, y: 350, r: 80, enemy: ['arcane_leopard'], bg: 'battle_bg2', used: false },
+      { x: 280, y: 420, r: 72, enemy: ['abyss_tiger'],    bg: 'battle_bg',  used: false },
+      { x: 580, y: 430, r: 72, enemy: ['arcane_leopard'], bg: 'battle_bg2', used: false },
     ];
 
     this.walkCycle = 0;
@@ -1165,7 +1290,7 @@ class ExploreManager {
 
     // If all guardians beaten, trigger Blaze Lion encounter near ward stone
     if (this.battleCount === 2) {
-      this.encounter_zones.push({ x: 680, y: 200, r: 60, enemy: ['blaze_lion'], bg: 'battle_bg3', used: false });
+      this.encounter_zones.push({ x: 750, y: 360, r: 60, enemy: ['blaze_lion'], bg: 'battle_bg3', used: false });
     }
   }
 
@@ -1205,8 +1330,19 @@ class ExploreManager {
       if (dist < obj.radius + 40) {
         if (obj.id === 'ward_stone') {
           if (!g.isQuestStageDone('trial_of_wards', 'defeat_guardians')) {
-            g.ui.showNotification('The Ward Stone pulses... defeat the guardians first!');
+            g.ui.showNotification('The Ward Stone pulses… defeat the guardians first!');
+            g.audio.playTone(180, 0.4, 'sine', 0.2);
             return;
+          }
+          const blazeDefeated = !this.encounter_zones.find(z => z.enemy[0] === 'blaze_lion' && !z.used)
+                                && this.battleCount >= 3;
+          if (this.battleCount >= 2 && !blazeDefeated) {
+            const bossStillAlive = this.encounter_zones.find(z => z.enemy[0] === 'blaze_lion' && !z.used);
+            if (bossStillAlive) {
+              g.ui.showNotification('A fierce presence blocks the Ward Stone!');
+              g.audio.playTone(180, 0.4, 'sawtooth', 0.2);
+              return;
+            }
           }
           // If Blaze Lion zone still active, trigger it
           const bossZone = this.encounter_zones.find(z => z.enemy[0] === 'blaze_lion' && !z.used);
@@ -1923,6 +2059,7 @@ class BattleManager {
     this.turnOrder = [];
     this.currentTurn = 0;
     this.phase = 'PLAYER_TURN'; // PLAYER_TURN, ENEMY_TURN, ANIMATING, VICTORY, DEFEAT
+    this.fadeIn = 1.0;          // 1=black, 0=clear — fades to 0 over ~0.8s on battle start
     this.selectedAction = 0; // 0=Attack, 1=Ability, 2=Item, 3=Defend
     this.selectedTarget = 0;
     this.selectedAbility = 0;
@@ -2438,6 +2575,7 @@ class BattleManager {
     this.logTimer += dt;
     this.animTimer += dt;
     this.updateFx(dt);
+    if (this.fadeIn > 0) this.fadeIn = Math.max(0, this.fadeIn - dt * 1.8);
   }
 
   // ─── Battle Input ─────────────────────────────────────────
@@ -2867,26 +3005,44 @@ class BattleManager {
     // Sub-menu: Ability list
     if (this.subMenu === 'ability') {
       const member = this.party[this.selectedMember];
-      const menuX = W * 0.55, menuY = partyY;
-      drawRoundedRect(ctx, menuX - 10, menuY - 8, 300, 160, 8, 'rgba(5,0,25,0.95)', 'rgba(120,60,200,0.7)', 2);
+      const abils = member?.abilities || [];
+      const menuH = Math.max(100, abils.length * 32 + 52);
+      const menuX = W * 0.55, menuY = partyY - (menuH - 140);
+      drawRoundedRect(ctx, menuX - 10, menuY - 8, 300, menuH, 8, 'rgba(5,0,25,0.95)', 'rgba(120,60,200,0.7)', 2);
       ctx.fillStyle = '#e0c0ff';
       ctx.font = 'bold 13px Cinzel, serif';
       ctx.textAlign = 'left';
       ctx.fillText('ABILITIES', menuX, menuY + 10);
-      (member?.abilities || []).forEach((abilId, i) => {
+      ctx.fillStyle = '#4080c0';
+      ctx.font = '11px monospace';
+      ctx.fillText(`MP: ${member?.currentMp ?? 0}/${member?.stats?.mp ?? 0}`, menuX + 150, menuY + 10);
+      abils.forEach((abilId, i) => {
         const def = this.game.getAbilityDef(abilId);
-        const ay = menuY + 30 + i * 28;
+        const cost = def?.mp_cost || 0;
+        const canAfford = (member?.currentMp ?? 0) >= cost;
+        const ay = menuY + 34 + i * 30;
         const sel = i === this.selectedAbility;
-        if (sel) { ctx.fillStyle = 'rgba(100,40,160,0.5)'; ctx.fillRect(menuX - 5, ay - 16, 295, 24); }
-        ctx.fillStyle = sel ? '#f0c060' : '#c090e0';
+        if (sel) { ctx.fillStyle = 'rgba(100,40,160,0.5)'; ctx.fillRect(menuX - 5, ay - 16, 295, sel && def?.description ? 40 : 24); }
+        ctx.fillStyle = !canAfford ? '#604050' : sel ? '#f0c060' : '#c090e0';
         ctx.font = `${sel ? 'bold' : ''} 12px Georgia, serif`;
-        ctx.fillText(`${def?.name || abilId}  MP:${def?.mp_cost || 0}`, menuX, ay);
-        if (sel && def) {
-          ctx.fillStyle = '#9060b0';
+        ctx.fillText(def?.name || abilId, menuX, ay);
+        ctx.fillStyle = !canAfford ? '#804060' : cost > 0 ? '#6090d0' : '#505060';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${cost}MP`, menuX + 285, ay);
+        ctx.textAlign = 'left';
+        if (sel && def?.description) {
+          ctx.fillStyle = canAfford ? '#9060b0' : '#603040';
           ctx.font = '10px Georgia';
-          ctx.fillText(def.description || '', menuX, ay + 13);
+          ctx.fillText(def.description, menuX, ay + 14);
+        }
+        if (!canAfford && sel) {
+          ctx.fillStyle = '#c04060';
+          ctx.font = 'bold 9px monospace';
+          ctx.fillText('NOT ENOUGH MP', menuX + 160, ay);
         }
       });
+      ctx.textAlign = 'left';
     }
 
     // Sub-menu: Item list
@@ -2943,6 +3099,12 @@ class BattleManager {
 
     // ── FX layer (drawn last, above everything) ──────────────
     this.renderFx(ctx);
+
+    // ── Fade-in overlay ───────────────────────────────────────
+    if (this.fadeIn > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${this.fadeIn})`;
+      ctx.fillRect(0, 0, W, H);
+    }
   }
 
   renderVictory(ctx, canvas) {
@@ -3008,24 +3170,70 @@ class BattleManager {
 
   renderDefeat(ctx, canvas) {
     const W = canvas.width, H = canvas.height;
-    ctx.fillStyle = 'rgba(20,0,0,0.95)';
+    // Dark red gradient bg
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#140000');
+    grad.addColorStop(1, '#060010');
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
+    // Title
     ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(255,50,50,0.8)';
     ctx.shadowBlur = 30;
     ctx.fillStyle = '#c04040';
-    ctx.font = `bold 36px 'Cinzel', serif`;
-    ctx.fillText('DEFEATED', W/2, H/2 - 40);
+    ctx.font = `bold 40px 'Cinzel', serif`;
+    ctx.fillText('✦  DEFEATED  ✦', W/2, H * 0.18);
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#906060';
-    ctx.font = '16px Georgia, serif';
-    ctx.fillText('The ward dims... but hope remains.', W/2, H/2 + 20);
+    ctx.fillStyle = '#806060';
+    ctx.font = '15px Georgia, serif';
+    ctx.fillText('The ward dims… but hope remains.', W/2, H * 0.28);
 
-    ctx.fillStyle = `rgba(180,100,100,${0.5 + this.game.titleGlow * 0.5})`;
-    ctx.font = '14px Georgia, serif';
-    ctx.fillText('[ Press ENTER to return ]', W/2, H/2 + 70);
+    // Party portraits row
+    const pSize = 72;
+    const startX = W/2 - (this.party.length * (pSize + 16))/2 + pSize/2;
+    this.party.forEach((m, i) => {
+      const px = startX + i * (pSize + 16);
+      const py = H * 0.38;
+      const portrait = this.game.images[m.portrait];
+      const alive = m.currentHp > 0;
+      ctx.save();
+      ctx.globalAlpha = alive ? 0.9 : 0.3;
+      if (!alive) { ctx.filter = 'grayscale(100%)'; }
+      if (portrait) {
+        ctx.beginPath();
+        ctx.roundRect(px - pSize/2, py, pSize, pSize, 8);
+        ctx.clip();
+        ctx.drawImage(portrait, px - pSize/2, py, pSize, pSize);
+      }
+      ctx.restore();
+      ctx.strokeStyle = alive ? '#804040' : '#303030';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(px - pSize/2, py, pSize, pSize);
+      ctx.fillStyle = alive ? '#c08080' : '#505050';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(alive ? `${m.currentHp}HP` : 'KO', px, py + pSize + 14);
+      ctx.fillText(m.name.split(' ')[0], px, py + pSize + 26);
+    });
+
+    // Party will be revived notice
+    const boxW = 380, boxH = 52;
+    drawRoundedRect(ctx, W/2 - boxW/2, H * 0.66, boxW, boxH, 8, 'rgba(40,10,10,0.8)', 'rgba(140,40,40,0.6)', 1);
+    ctx.fillStyle = '#d08080';
+    ctx.font = 'bold 13px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Party revived at half HP — try again!', W/2, H * 0.66 + 21);
+    ctx.fillStyle = '#906060';
+    ctx.font = '11px monospace';
+    ctx.fillText('Enemies in the Warded Grounds reset.', W/2, H * 0.66 + 40);
+
+    // Prompt
+    const pulse = 0.5 + Math.sin(this.animTimer * 3) * 0.4;
+    ctx.fillStyle = `rgba(200,100,100,${pulse})`;
+    ctx.font = 'bold 14px Cinzel, serif';
+    ctx.fillText('[ ENTER / SPACE — Return to the Grounds ]', W/2, H * 0.86);
   }
 }
 
