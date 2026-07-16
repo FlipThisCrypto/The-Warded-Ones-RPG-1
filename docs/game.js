@@ -317,6 +317,7 @@ class WardedOnesGame {
     this.dialogue = new DialogueManager(this, 'intro', () => {
       this.state = STATE.EXPLORE;
       this.explore.init();
+      this.audio.playExploreMusic();
     });
     this.state = STATE.CUTSCENE;
   }
@@ -382,6 +383,7 @@ class WardedOnesGame {
       this.explore = new ExploreManager(this);
       this.explore.init(data.exploreState);
       this.state = STATE.EXPLORE;
+      this.audio.playExploreMusic();
       return true;
     } catch (e) {
       console.error('Save load failed:', e);
@@ -426,6 +428,7 @@ class WardedOnesGame {
 
     this.battle = new BattleManager(this, this.party.filter(m => m.currentHp > 0), enemies, bgKey, onWin, onLose);
     this.state = STATE.BATTLE;
+    this.audio.playBattleMusic();
   }
 
   // ─── Quest helpers ────────────────────────────────────────
@@ -648,6 +651,188 @@ class AudioManager {
   }
   playCursor() { this.playTone(440, 0.05, 'sine', 0.15); }
   playDialogue() { this.playTone(880, 0.04, 'sine', 0.1); }
+
+  // ── Procedural Music ─────────────────────────────────────────
+  stopMusic() {
+    if (this._musicNodes) {
+      this._musicNodes.forEach(n => { try { n.stop(); } catch(e) {} });
+    }
+    this._musicNodes = [];
+    this._musicTrack = null;
+    if (this._beatTimeout) { clearTimeout(this._beatTimeout); this._beatTimeout = null; }
+    if (this._melodyTimeout) { clearTimeout(this._melodyTimeout); this._melodyTimeout = null; }
+  }
+
+  _makeDrone(freq, type, vol, detune = 0) {
+    // Returns a running oscillator+gain node pair — caller stores for cleanup
+    this.initContext();
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filt = this.ctx.createBiquadFilter();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.detune.value = detune;
+    filt.type = 'lowpass';
+    filt.frequency.value = 800;
+    osc.connect(filt);
+    filt.connect(gain);
+    gain.connect(this.ctx.destination);
+    gain.gain.value = vol * this.musicVol * this.masterVol;
+    osc.start();
+    return [osc, gain, filt];
+  }
+
+  playExploreMusic() {
+    if (this._musicTrack === 'explore') return;
+    this.stopMusic();
+    this._musicTrack = 'explore';
+    try {
+      this.initContext();
+      this._musicNodes = [];
+
+      // Slow, dark ambient drone — root + fifth + octave
+      // D minor feel: D2=73Hz, A2=110Hz, D3=147Hz, F3=175Hz
+      const drones = [
+        [73.4, 'sine', 0.12, 0],
+        [73.4, 'triangle', 0.07, 7],    // slight detune for shimmer
+        [110.0, 'sine', 0.08, 0],
+        [146.8, 'sine', 0.05, -5],
+      ];
+      drones.forEach(([f, t, v, d]) => {
+        this._musicNodes.push(...this._makeDrone(f, t, v, d));
+      });
+
+      // Slow filter sweep for atmosphere
+      const t = this.ctx.currentTime;
+      const filtNode = this._musicNodes.find(n => n instanceof BiquadFilterNode);
+      if (filtNode) {
+        filtNode.frequency.setValueAtTime(400, t);
+        filtNode.frequency.linearRampToValueAtTime(1200, t + 8);
+        filtNode.frequency.linearRampToValueAtTime(400, t + 16);
+      }
+
+      // Pulsing bass note every ~3.2s
+      const bassNotes = [73.4, 82.4, 73.4, 65.4, 73.4];
+      let bassStep = 0;
+      const doBass = () => {
+        if (this._musicTrack !== 'explore') return;
+        try {
+          const freq = bassNotes[bassStep % bassNotes.length];
+          bassStep++;
+          this.initContext();
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          osc.connect(g);
+          g.connect(this.ctx.destination);
+          const now = this.ctx.currentTime;
+          g.gain.setValueAtTime(0, now);
+          g.gain.linearRampToValueAtTime(0.14 * this.musicVol * this.masterVol, now + 0.4);
+          g.gain.linearRampToValueAtTime(0.04 * this.musicVol * this.masterVol, now + 2.8);
+          g.gain.linearRampToValueAtTime(0, now + 3.1);
+          osc.start(now);
+          osc.stop(now + 3.2);
+        } catch(e) {}
+        this._beatTimeout = setTimeout(doBass, 3200);
+      };
+      doBass();
+
+      // Sparse high melody — pentatonic D minor: D4 F4 G4 A4 C5
+      const melody = [293.7, 349.2, 392.0, 440.0, 523.3, 440.0, 392.0, 349.2];
+      let melStep = 0;
+      const doMelody = () => {
+        if (this._musicTrack !== 'explore') return;
+        try {
+          const freq = melody[melStep % melody.length];
+          melStep++;
+          this.initContext();
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          osc.connect(g);
+          g.connect(this.ctx.destination);
+          const now = this.ctx.currentTime;
+          g.gain.setValueAtTime(0, now);
+          g.gain.linearRampToValueAtTime(0.06 * this.musicVol * this.masterVol, now + 0.1);
+          g.gain.linearRampToValueAtTime(0, now + 1.2);
+          osc.start(now);
+          osc.stop(now + 1.3);
+        } catch(e) {}
+        this._melodyTimeout = setTimeout(doMelody, 1400 + Math.floor(melStep % 3) * 400);
+      };
+      setTimeout(doMelody, 2000); // delayed start so bass enters first
+    } catch(e) {}
+  }
+
+  playBattleMusic() {
+    if (this._musicTrack === 'battle') return;
+    this.stopMusic();
+    this._musicTrack = 'battle';
+    try {
+      this.initContext();
+      this._musicNodes = [];
+
+      // Driving bass pulse — E1=41Hz in minor
+      const bassDrone = [41.2, 'sawtooth', 0.09, 0];
+      this._musicNodes.push(...this._makeDrone(...bassDrone));
+
+      // Mid tension layer
+      this._musicNodes.push(...this._makeDrone(82.4, 'square', 0.04, 5));
+
+      // Rhythmic stab — 16th-note feel at ~120bpm → 0.125s per 16th
+      // Pattern: kick on 1,3; accent on 2,4 of each beat (4/4 bar = 2s)
+      const beatPattern = [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,1,0,0]; // 16ths
+      let beatIdx = 0;
+      const doBeat = () => {
+        if (this._musicTrack !== 'battle') return;
+        try {
+          if (beatPattern[beatIdx % beatPattern.length]) {
+            this.initContext();
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = beatIdx % 8 === 0 ? 82.4 : 61.7; // accent variation
+            osc.connect(g);
+            g.connect(this.ctx.destination);
+            const now = this.ctx.currentTime;
+            g.gain.setValueAtTime(0.18 * this.musicVol * this.masterVol, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+            osc.start(now);
+            osc.stop(now + 0.12);
+          }
+        } catch(e) {}
+        beatIdx++;
+        this._beatTimeout = setTimeout(doBeat, 125); // 16th note at ~120bpm
+      };
+      doBeat();
+
+      // High-tension melodic stabs — E minor arpeggio: E4 G4 B4 E5
+      const battleMelody = [329.6, 392.0, 493.9, 659.3, 493.9, 392.0];
+      let mIdx = 0;
+      const doMelody = () => {
+        if (this._musicTrack !== 'battle') return;
+        try {
+          this.initContext();
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.value = battleMelody[mIdx % battleMelody.length];
+          osc.connect(g);
+          g.connect(this.ctx.destination);
+          const now = this.ctx.currentTime;
+          g.gain.setValueAtTime(0.055 * this.musicVol * this.masterVol, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } catch(e) {}
+        mIdx++;
+        this._melodyTimeout = setTimeout(doMelody, 250 + (mIdx % 4 === 0 ? 500 : 0));
+      };
+      setTimeout(doMelody, 500);
+    } catch(e) {}
+  }
 }
 
 // ─── UI Manager ──────────────────────────────────────────────
@@ -2446,11 +2631,13 @@ class BattleManager {
   endVictory() {
     this.game.battle = null;
     this.game.state = STATE.EXPLORE;
+    this.game.audio.playExploreMusic();
     if (this.onWin) this.onWin();
   }
 
   endDefeat() {
     this.game.battle = null;
+    this.game.audio.playExploreMusic();
     if (this.onLose) this.onLose();
     else this.game.state = STATE.EXPLORE;
   }
