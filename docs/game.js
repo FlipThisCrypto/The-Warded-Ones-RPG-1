@@ -713,10 +713,12 @@ class InputManager {
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
         if (ui.pauseSelection === 3) { audio.musicVol = Math.max(0, audio.musicVol - 0.1); if (audio._audioEl) audio._audioEl.volume = audio.musicVol * audio.masterVol; }
         if (ui.pauseSelection === 4) audio.sfxVol = Math.max(0, audio.sfxVol - 0.1);
+        if (ui.pauseSelection >= 3) audio.saveSettings();
       }
       if (e.code === 'ArrowRight' || e.code === 'KeyD') {
         if (ui.pauseSelection === 3) { audio.musicVol = Math.min(1, audio.musicVol + 0.1); if (audio._audioEl) audio._audioEl.volume = audio.musicVol * audio.masterVol; }
         if (ui.pauseSelection === 4) audio.sfxVol = Math.min(1, audio.sfxVol + 0.1);
+        if (ui.pauseSelection >= 3) audio.saveSettings();
       }
       if (e.code === 'Enter' || e.code === 'KeyZ' || e.code === 'KeyF') {
         if (ui.pauseSelection === 0) { g.state = STATE.EXPLORE; }
@@ -758,12 +760,31 @@ class AudioManager {
     this.musicVol = 0.5;
     this.sfxVol = 0.7;
     this.currentMusic = null;
+    this.loadSettings();
   }
 
   initContext() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     }
+  }
+
+  // ── Settings persistence (survives reloads, separate from save slots) ──
+  loadSettings() {
+    try {
+      const raw = localStorage.getItem('warded_ones_settings_v1');
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (typeof s.musicVol === 'number') this.musicVol = Math.max(0, Math.min(1, s.musicVol));
+      if (typeof s.sfxVol === 'number') this.sfxVol = Math.max(0, Math.min(1, s.sfxVol));
+    } catch (e) {}
+  }
+
+  saveSettings() {
+    try {
+      localStorage.setItem('warded_ones_settings_v1',
+        JSON.stringify({ musicVol: this.musicVol, sfxVol: this.sfxVol }));
+    } catch (e) {}
   }
 
   playTone(freq, duration, type = 'sine', volume = 0.3) {
