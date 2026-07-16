@@ -628,6 +628,7 @@ class WardedOnesGame {
     member.currentHp = Math.min(member.currentHp + g.hp, member.stats.hp);
     member.currentMp = Math.min(member.currentMp + g.mp, member.stats.mp);
     member.expToNext = Math.floor(member.expToNext * 1.4);
+    this.audio.playLevelUp();
     return { level: member.level, name: member.name };
   }
 }
@@ -762,6 +763,10 @@ class AudioManager {
   playVictory() {
     const melody = [523, 659, 784, 1047, 784, 1047, 1319];
     melody.forEach((f, i) => setTimeout(() => this.playTone(f, 0.25, 'sine', 0.35), i * 120));
+  }
+  playLevelUp() {
+    const melody = [440, 554, 659, 880, 1109, 1319];
+    melody.forEach((f, i) => setTimeout(() => this.playTone(f, 0.15, 'sine', 0.3), i * 60));
   }
   playDefeat() {
     [440, 392, 330, 277].forEach((f, i) => setTimeout(() => this.playTone(f, 0.4, 'sawtooth', 0.2), i * 200));
