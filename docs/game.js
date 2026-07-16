@@ -1322,6 +1322,26 @@ class ExploreManager {
         color: '#d0a0ff',
         radius: 25,
         icon: '✦',
+      },
+      {
+        id: 'chest_gold',
+        x: 420, y: 160,
+        label: 'Chest',
+        color: '#f5e01d',
+        radius: 20,
+        type: 'chest',
+        reward: { gold: 120, item: 'potion' },
+        opened: false
+      },
+      {
+        id: 'chest_relic',
+        x: 720, y: 480,
+        label: 'Ancient Cache',
+        color: '#80ffcc',
+        radius: 20,
+        type: 'chest',
+        reward: { gold: 250, item: 'elixir' },
+        opened: false
       }
     ];
 
@@ -1481,6 +1501,30 @@ class ExploreManager {
     for (const obj of this.objects) {
       const dist = Math.hypot(this.playerX - obj.x, this.playerY - obj.y);
       if (dist < obj.radius + 40) {
+        if (obj.type === 'chest') {
+          if (obj.opened) {
+            g.ui.showNotification('The chest is empty.');
+            g.audio.playCancel();
+            return;
+          }
+          g.audio.playConfirm();
+          obj.opened = true;
+          
+          let logMsg = 'Opened the chest!';
+          if (obj.reward.gold) {
+            g.gold += obj.reward.gold;
+            logMsg += ` +${obj.reward.gold} Gold.`;
+          }
+          if (obj.reward.item) {
+            g.addItem(obj.reward.item);
+            const itemDef = g.getItemDef(obj.reward.item);
+            logMsg += ` Found ${itemDef ? itemDef.name : obj.reward.item}!`;
+          }
+          
+          g.ui.showNotification(logMsg);
+          return;
+        }
+
         if (obj.id === 'ward_stone') {
           if (!g.isQuestStageDone('trial_of_wards', 'defeat_guardians')) {
             g.ui.showNotification('The Ward Stone pulses… defeat the guardians first!');
@@ -1884,9 +1928,58 @@ class ExploreManager {
     });
   }
 
-  // ── Ward Stone ─────────────────────────────────────────────
+  // ── Ward Stone & Interactive Chests ────────────────────────
+  _renderChest(ctx, obj, t) {
+    const cx = obj.x, cy = obj.y - 8;
+    const w = 24, h = 18;
+    ctx.save();
+    
+    // Draw wood box base
+    ctx.fillStyle = obj.opened ? '#5a3d28' : '#7d5233';
+    ctx.strokeStyle = '#362214';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(cx - w/2, cy - h/2, w, h, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw iron bands
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(cx - w/2 + 3, cy - h/2, 3, h);
+    ctx.fillRect(cx + w/2 - 6, cy - h/2, 3, h);
+
+    // Draw lock latch
+    ctx.fillStyle = obj.opened ? '#c090e0' : '#ffd700'; // golden lock or purple energy glow if opened
+    if (obj.opened) {
+      // open lid line
+      ctx.strokeStyle = '#362214';
+      ctx.beginPath();
+      ctx.moveTo(cx - w/2, cy - h/2 + 5);
+      ctx.lineTo(cx + w/2, cy - h/2 + 5);
+      ctx.stroke();
+    } else {
+      ctx.fillRect(cx - 2, cy - 2, 4, 5);
+      // lock glow pulse
+      const pulse = 0.5 + Math.sin(t * 6) * 0.5;
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 8 * pulse;
+    }
+    
+    ctx.restore();
+
+    // Label below chest
+    ctx.fillStyle = obj.opened ? '#808080' : '#ffe080';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(obj.opened ? '🔓 OPENED' : '🔒 ' + obj.label, obj.x, obj.y + 16);
+  }
+
   _renderWardStone(ctx, t, glow) {
     this.objects.forEach(obj => {
+      if (obj.type === 'chest') {
+        this._renderChest(ctx, obj, t);
+        return;
+      }
       const pulse = 0.6 + Math.sin(t * 1.8) * 0.4;
       const done = this.stoneTouched;
       const stoneColor = done ? [80, 255, 120] : [180, 80, 255];
