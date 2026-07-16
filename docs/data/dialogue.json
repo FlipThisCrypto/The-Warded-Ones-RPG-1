@@ -197,5 +197,34 @@
       "portrait": "assets/characters/cogsworth.png",
       "text": "All gears nominal. Point me at whatever needs outlasting."
     }
+  ],
+  "npc_sir_paradox": [
+    {
+      "speaker": "Sir Paradox",
+      "portrait": "assets/characters/sir_paradox.png",
+      "text": "Halt! I must warn you: I have already joined your party. I am also certain I never will."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "...Tess, is he broken? Gloam, did you do this?"
+    },
+    {
+      "speaker": "Sir Paradox",
+      "portrait": "assets/characters/sir_paradox.png",
+      "text": "Broken? I am the only consistent thing here. Very well - to resolve the paradox, I accept the invitation you have not made."
+    },
+    {
+      "speaker": "Sir Paradox",
+      "portrait": "assets/characters/sir_paradox.png",
+      "text": "Sir Paradox joins the party!"
+    }
+  ],
+  "npc_sir_paradox_after": [
+    {
+      "speaker": "Sir Paradox",
+      "portrait": "assets/characters/sir_paradox.png",
+      "text": "Onward! Or backward. In my experience they arrive at the same place."
+    }
   ]
 }

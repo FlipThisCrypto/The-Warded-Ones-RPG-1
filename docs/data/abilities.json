@@ -297,5 +297,45 @@
     "effect": "burn",
     "effect_duration": 2,
     "description": "Redlines the boiler for a scorching overdriven strike."
+  },
+  "impossible_thrust": {
+    "id": "impossible_thrust",
+    "name": "Impossible Thrust",
+    "mp_cost": 9,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.15,
+    "description": "A lunge from an angle that does not exist. Reliable, inexplicable damage."
+  },
+  "contradiction": {
+    "id": "contradiction",
+    "name": "Contradiction",
+    "mp_cost": 13,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 0.85,
+    "effect": "confuse",
+    "effect_duration": 2,
+    "description": "Argues the target into incoherence. Damages and may confuse for 2 turns."
+  },
+  "quantum_feint": {
+    "id": "quantum_feint",
+    "name": "Quantum Feint",
+    "mp_cost": 12,
+    "target": "self",
+    "type": "buff",
+    "effect": "evade",
+    "effect_duration": 2,
+    "description": "Exists in two stances at once; incoming blows pick the empty one."
+  },
+  "checkmate": {
+    "id": "checkmate",
+    "name": "Checkmate",
+    "mp_cost": 24,
+    "target": "single_enemy",
+    "type": "attack",
+    "power": 1.4,
+    "effect": "random_power",
+    "description": "Declares the duel already won. Luck decides how emphatically."
   }
 }

@@ -160,5 +160,38 @@
     "description": "A ticking construct of brass and stubbornness. Slow to act, nearly impossible to put down, and the wall the others hide behind.",
     "battle_quote": "Tick. Tock. Your time is up.",
     "victory_quote": "Right on schedule."
+  },
+  {
+    "id": "sir_paradox",
+    "name": "Sir Paradox",
+    "title": "The Contradiction Knight",
+    "class": "Paradox Knight",
+    "recruit": true,
+    "portrait": "assets/characters/sir_paradox.png",
+    "stats": {
+      "hp": 132,
+      "mp": 95,
+      "atk": 26,
+      "def": 16,
+      "spd": 17,
+      "lck": 22
+    },
+    "growth": {
+      "hp": 16,
+      "mp": 11,
+      "atk": 4,
+      "def": 2,
+      "spd": 2,
+      "lck": 4
+    },
+    "abilities": [
+      "impossible_thrust",
+      "contradiction",
+      "quantum_feint",
+      "checkmate"
+    ],
+    "description": "A knight who fights by unhappening things. His blade lands where it logically cannot, and fortune bends to keep the joke going.",
+    "battle_quote": "I never lose. I also never win. Confusing, isn't it?",
+    "victory_quote": "As I both predicted and doubted."
   }
 ]

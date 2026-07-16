@@ -1400,6 +1400,17 @@ class ExploreManager {
         recruitId: 'cogsworth',
         dialogueKey: 'npc_cogsworth',
         afterKey: 'npc_cogsworth_after',
+      },
+      {
+        id: 'sir_paradox',
+        x: 450, y: 555,     // south gate, between the two encounter zones
+        label: 'Sir Paradox',
+        color: '#80ffd0',
+        radius: 20,
+        type: 'recruit',
+        recruitId: 'sir_paradox',
+        dialogueKey: 'npc_sir_paradox',
+        afterKey: 'npc_sir_paradox_after',
       }
     ];
     // A recruit NPC whose character is already in the party (loaded save)
@@ -3387,7 +3398,10 @@ class BattleManager {
     const activeMember = this.party[this.selectedMember];
 
     this.party.forEach((m, i) => {
-      const px = 20 + i * (W / this.party.length - 10);
+      // With 5-6 recruits, compact the row into the left 62% so the
+      // action menu column (right side) stays clear of the last cards.
+      const usableW = this.party.length >= 5 ? W * 0.62 : W;
+      const px = 20 + i * (usableW / this.party.length - 10);
       const py = partyY;
       const isCurrent = i === this.selectedMember && this.phase === 'PLAYER_TURN';
 
