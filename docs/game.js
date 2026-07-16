@@ -365,7 +365,7 @@ class WardedOnesGame {
     ctx.textAlign = 'center';
     ctx.font = `${Math.floor(W * 0.014)}px 'Georgia', serif`;
     ctx.fillStyle = `rgba(180, 140, 220, ${0.5 + this.titleGlow * 0.5})`;
-    ctx.fillText('[ ENTER / CLICK to select ]', W / 2, H * 0.88);
+    ctx.fillText('W/S or ARROWS: Navigate   |   ENTER / CLICK: Select', W / 2, H * 0.88);
   }
 
   // ─── Particle System ──────────────────────────────────────
@@ -1011,10 +1011,10 @@ class UI {
     drawSlider('Music', audio.musicVol, sliderY + 12);
     drawSlider('SFX  ', audio.sfxVol,   sliderY + 52);
 
-    ctx.fillStyle = '#504060';
+    ctx.fillStyle = '#807090';
     ctx.font = '10px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('← → adjust  (while paused, Up/Down select)', W / 2, by + boxH - 30);
+    ctx.fillText('W/S: Navigate  |  A/D: Adjust Vol  |  ESC / ENTER: Confirm / Resume', W / 2, by + boxH - 30);
 
     const g = this.game;
     const objective = g.getQuestObjective('trial_of_wards');
@@ -1252,7 +1252,7 @@ class UI {
     ctx.textAlign = 'center';
     ctx.font = '11px monospace';
     ctx.fillStyle = 'rgba(150,100,200,0.5)';
-    ctx.fillText('WASD/Arrows: Move   F/Enter: Interact   Esc: Pause', W/2, canvas.height - 8);
+    ctx.fillText('WASD/Arrows: Move   F/Enter: Interact   J: Journal   Esc: Pause', W/2, canvas.height - 8);
   }
 }
 
