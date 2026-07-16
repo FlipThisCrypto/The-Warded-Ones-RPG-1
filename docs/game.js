@@ -516,6 +516,12 @@ class WardedOnesGame {
 
   // ─── Battle ───────────────────────────────────────────────
   startBattle(enemyIds, bgKey, onWin, onLose) {
+    // Snapshot for the defeat-screen Retry option: same encounter, and the
+    // party restored to exactly what they walked in with.
+    this._retryBattle = {
+      enemyIds: [...enemyIds], bgKey, onWin, onLose,
+      partySnapshot: this.party.map(m => ({ id: m.id, hp: m.currentHp, mp: m.currentMp })),
+    };
     const enemies = enemyIds.map(id => {
       const def = this.data.enemies.find(e => e.id === id);
       if (!def) return null;
@@ -531,6 +537,18 @@ class WardedOnesGame {
     this.battle = new BattleManager(this, this.party.filter(m => m.currentHp > 0), enemies, bgKey, onWin, onLose);
     this.state = STATE.BATTLE;
     this.audio.playBattleMusic();
+  }
+
+  /** Defeat-screen Retry: restore the pre-battle party and re-run the fight. */
+  retryLastBattle() {
+    const r = this._retryBattle;
+    if (!r) { this.battle?.endDefeat(); return; }
+    r.partySnapshot.forEach(s => {
+      const m = this.party.find(p => p.id === s.id);
+      if (m) { m.currentHp = s.hp; m.currentMp = s.mp; }
+    });
+    this.battle = null;
+    this.startBattle(r.enemyIds, r.bgKey, r.onWin, r.onLose);
   }
 
   // ─── Quest helpers ────────────────────────────────────────
@@ -736,7 +754,8 @@ class InputManager {
     }
 
     if (s0 === STATE.DEFEAT) {
-      if (e.code === 'Enter' || e.code === 'Space') { g.battle?.endDefeat(); }
+      if (e.code === 'Enter' || e.code === 'Space') { g.retryLastBattle(); }
+      if (e.code === 'Escape' || e.code === 'KeyX') { g.battle?.endDefeat(); }
     }
 
     if (s0 === STATE.QUEST_COMPLETE) {
@@ -1640,23 +1659,26 @@ class ExploreManager {
         const dist = Math.hypot(this.playerX - zone.x, this.playerY - zone.y);
         if (dist < zone.r) {
           zone.used = true;
-          this.triggerBattle(zone.enemy, zone.bg);
+          this.triggerBattle(zone.enemy, zone.bg, zone);
         }
       });
     }
   }
 
-  triggerBattle(enemyIds, bgKey) {
+  triggerBattle(enemyIds, bgKey, zone) {
     const g = this.game;
     g.audio.playTone(200, 0.5, 'sawtooth', 0.3);
+    // Walking away from a lost fight re-arms its zone — otherwise a loss
+    // consumed the encounter and quest battles became uncompletable.
+    const onLose = () => { if (zone) zone.used = false; this.onBattleLose(); };
     // Show battle intro dialogue if first tiger
     const introKey = enemyIds[0] === 'abyss_tiger' ? 'battle_intro_tiger' : null;
     if (introKey) {
       g.startDialogue(introKey, () => {
-        g.startBattle(enemyIds, bgKey, () => this.onBattleWin(), () => this.onBattleLose());
+        g.startBattle(enemyIds, bgKey, () => this.onBattleWin(), onLose);
       });
     } else {
-      g.startBattle(enemyIds, bgKey, () => this.onBattleWin(), () => this.onBattleLose());
+      g.startBattle(enemyIds, bgKey, () => this.onBattleWin(), onLose);
     }
   }
 
@@ -3957,22 +3979,22 @@ class BattleManager {
       ctx.fillText(m.name.split(' ')[0], px, py + pSize + 26);
     });
 
-    // Party will be revived notice
-    const boxW = 380, boxH = 52;
+    // Options notice
+    const boxW = 400, boxH = 52;
     drawRoundedRect(ctx, W/2 - boxW/2, H * 0.66, boxW, boxH, 8, 'rgba(40,10,10,0.8)', 'rgba(140,40,40,0.6)', 1);
     ctx.fillStyle = '#d08080';
     ctx.font = 'bold 13px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Party revived at half HP — try again!', W/2, H * 0.66 + 21);
+    ctx.fillText('Retry restores the party as it stood before the fight.', W/2, H * 0.66 + 21);
     ctx.fillStyle = '#906060';
     ctx.font = '11px monospace';
-    ctx.fillText('Enemies in the Warded Grounds reset.', W/2, H * 0.66 + 40);
+    ctx.fillText('Waking revives the fallen at half HP.', W/2, H * 0.66 + 40);
 
     // Prompt
     const pulse = 0.5 + Math.sin(this.animTimer * 3) * 0.4;
     ctx.fillStyle = `rgba(200,100,100,${pulse})`;
     ctx.font = 'bold 14px Cinzel, serif';
-    ctx.fillText('[ ENTER / SPACE — Return to the Grounds ]', W/2, H * 0.86);
+    ctx.fillText('[ ENTER — Retry Battle    ·    ESC — Wake at the Grounds ]', W/2, H * 0.86);
   }
 }
 
