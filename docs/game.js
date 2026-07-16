@@ -191,6 +191,51 @@ class WardedOnesGame {
     // Draw particles
     this.renderParticles(ctx);
 
+    // Animated ward circle — rotates behind menu items
+    const t = this.animTimer;
+    ctx.save();
+    ctx.translate(W / 2, H * 0.55);
+    const ringRadii = [70, 110, 148, 178, 202];
+    ringRadii.forEach((r, ri) => {
+      const rot = t * (ri % 2 === 0 ? 0.18 : -0.13) + ri * 0.9;
+      const alpha = 0.07 + ri * 0.015;
+      ctx.strokeStyle = `rgba(160,80,255,${alpha})`;
+      ctx.lineWidth = ri === 0 ? 1.5 : 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spokes
+      if (ri < 4) {
+        const spokeCount = 4 + ri * 2;
+        ctx.strokeStyle = `rgba(160,80,255,${alpha * 0.6})`;
+        ctx.lineWidth = 0.5;
+        for (let s = 0; s < spokeCount; s++) {
+          const angle = rot + (s / spokeCount) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+          ctx.stroke();
+        }
+      }
+    });
+    // Orbiting rune dots
+    const dotDefs = [
+      { orbitR: 110, count: 6, speed: 0.25, color: 'rgba(200,100,255,' },
+      { orbitR: 178, count: 8, speed: -0.18, color: 'rgba(255,200,80,' },
+    ];
+    dotDefs.forEach(d => {
+      for (let di = 0; di < d.count; di++) {
+        const angle = t * d.speed + (di / d.count) * Math.PI * 2;
+        const dx = Math.cos(angle) * d.orbitR;
+        const dy = Math.sin(angle) * d.orbitR;
+        ctx.fillStyle = d.color + '0.55)';
+        ctx.beginPath();
+        ctx.arc(dx, dy, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+    ctx.restore();
+
     // Atmospheric glow
     const glow = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.6);
     glow.addColorStop(0, `rgba(80, 20, 120, ${0.15 + this.titleGlow * 0.1})`);
@@ -489,7 +534,7 @@ class WardedOnesGame {
     const quest = this.quests.find(q => q.id === questId);
     if (!quest) return;
     const stage = quest.stages.find(s => s.id === stageId);
-    if (stage) stage.complete = true;
+    if (stage) { stage.complete = true; this.save(); } // auto-save on stage completion
   }
 
   incrementQuestCount(questId, stageId) {
@@ -498,8 +543,7 @@ class WardedOnesGame {
     const stage = quest.stages.find(s => s.id === stageId);
     if (!stage) return;
     stage.current = (stage.current || 0) + 1;
-    if (stage.current >= stage.count) stage.complete = true;
-    // Update objective text
+    if (stage.current >= stage.count) { stage.complete = true; this.save(); } // auto-save on stage completion
     stage.objective = `Defeat the Guardian Beasts (${Math.min(stage.current, stage.count)}/${stage.count})`;
   }
 
@@ -1046,13 +1090,96 @@ class UI {
     // Notification
     if (this.notification && this.notifTimer > 0) {
       this.notifTimer -= 0.016;
-      ctx.textAlign = 'center';
       const alpha = Math.min(1, this.notifTimer);
-      ctx.fillStyle = `rgba(0,0,0,${alpha * 0.7})`;
-      ctx.fillRect(W/2 - 150, canvas.height * 0.08 - 16, 300, 34);
-      ctx.fillStyle = `rgba(240,200,80,${alpha})`;
-      ctx.font = 'bold 15px Georgia, serif';
-      ctx.fillText(this.notification, W/2, canvas.height * 0.08 + 5);
+      const slideY = this.notifTimer > 2.5 ? (3 - this.notifTimer) * 40 : // slide in
+                     this.notifTimer < 0.5 ? (0.5 - this.notifTimer) * -80 : 0; // slide out
+      const isQuest = this.notification.startsWith('✦') || this.notification.includes('Quest') || this.notification.includes('Guardian');
+      const nW = Math.min(this.notification.length * 9 + 60, 480);
+      const nx = W/2 - nW/2, ny = canvas.height * 0.06 + slideY;
+      ctx.fillStyle = `rgba(0,0,0,${alpha * 0.8})`;
+      ctx.fillRect(nx, ny, nW, 42);
+      ctx.strokeStyle = isQuest ? `rgba(240,200,80,${alpha * 0.8})` : `rgba(160,100,255,${alpha * 0.6})`;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(nx, ny, nW, 42);
+      if (isQuest) {
+        ctx.fillStyle = `rgba(240,200,80,${alpha * 0.15})`;
+        ctx.fillRect(nx, ny, nW, 42);
+      }
+      ctx.textAlign = 'center';
+      ctx.fillStyle = isQuest ? `rgba(255,220,80,${alpha})` : `rgba(200,180,255,${alpha})`;
+      ctx.font = `bold 14px ${isQuest ? 'Cinzel,' : ''} Georgia, serif`;
+      ctx.fillText(this.notification, W/2, ny + 26);
+    }
+
+    // Gold + playtime — top right chip
+    const g2 = this.game;
+    const goldStr = `⬡ ${g2.gold} G`;
+    const timeStr = (() => { const m = Math.floor((g2.playtime||0)/60); const s = Math.floor((g2.playtime||0)%60); return `${m}:${String(s).padStart(2,'0')}`; })();
+    const chipW = 130;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(W - chipW - 8, 8, chipW, 38);
+    ctx.strokeStyle = 'rgba(200,160,60,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(W - chipW - 8, 8, chipW, 38);
+    ctx.fillStyle = '#f0d060';
+    ctx.font = 'bold 13px Georgia, serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(goldStr, W - 14, 24);
+    ctx.fillStyle = 'rgba(160,120,200,0.7)';
+    ctx.font = '10px monospace';
+    ctx.fillText(timeStr, W - 14, 40);
+
+    // Party status panel — bottom left
+    const party = this.game.party;
+    if (party && party.length) {
+      const cardW = 158, cardH = 34, cardGap = 4;
+      const panelH = party.length * cardH + (party.length - 1) * cardGap;
+      const startY = canvas.height - 28 - panelH;
+      party.forEach((m, i) => {
+        const cx = 8, cy = startY + i * (cardH + cardGap);
+        const hpRatio = Math.max(0, Math.min(1, m.currentHp / m.maxHp));
+        const mpRatio = Math.max(0, Math.min(1, m.currentMp / m.maxMp));
+        const isKO = m.currentHp <= 0;
+        ctx.fillStyle = isKO ? 'rgba(40,0,0,0.7)' : 'rgba(0,0,0,0.62)';
+        ctx.fillRect(cx, cy, cardW, cardH);
+        ctx.strokeStyle = isKO ? 'rgba(180,30,30,0.5)' : 'rgba(100,60,180,0.45)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx, cy, cardW, cardH);
+        // Name + level
+        ctx.fillStyle = isKO ? 'rgba(180,60,60,0.9)' : '#c8a8ff';
+        ctx.font = 'bold 10px Cinzel, serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(m.name, cx + 6, cy + 12);
+        ctx.fillStyle = isKO ? 'rgba(180,60,60,0.7)' : 'rgba(180,140,255,0.6)';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(isKO ? 'KO' : `Lv.${m.level}`, cx + cardW - 5, cy + 12);
+        // HP bar track + fill
+        const barX = cx + 6, barY = cy + 17, barW = cardW - 12;
+        ctx.fillStyle = 'rgba(60,20,20,0.8)';
+        ctx.fillRect(barX, barY, barW, 6);
+        const hpColor = hpRatio > 0.5 ? '#40c060' : hpRatio > 0.25 ? '#c0a020' : '#c03030';
+        ctx.fillStyle = hpColor;
+        ctx.fillRect(barX, barY, barW * hpRatio, 6);
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(barX, barY, barW * hpRatio, 2);
+        // HP text
+        ctx.fillStyle = 'rgba(220,220,220,0.7)';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`HP ${m.currentHp}/${m.maxHp}`, barX, cy + 32);
+        // MP bar track + fill
+        ctx.fillStyle = 'rgba(20,20,60,0.8)';
+        ctx.fillRect(barX + 60, barY, barW - 60, 6);
+        ctx.fillStyle = '#4080c0';
+        ctx.fillRect(barX + 60, barY, (barW - 60) * mpRatio, 6);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(barX + 60, barY, (barW - 60) * mpRatio, 2);
+        // MP text
+        ctx.fillStyle = 'rgba(140,180,240,0.7)';
+        ctx.textAlign = 'right';
+        ctx.fillText(`MP ${m.currentMp}/${m.maxMp}`, cx + cardW - 5, cy + 32);
+      });
     }
 
     // Controls hint
@@ -1248,8 +1375,29 @@ class ExploreManager {
     if (dx !== 0 || dy !== 0) {
       const len = Math.sqrt(dx*dx + dy*dy);
       dx /= len; dy /= len;
-      this.playerX = Math.max(30, Math.min(W - 30, this.playerX + dx * this.speed * dt));
-      this.playerY = Math.max(30, Math.min(H - 30, this.playerY + dy * this.speed * dt));
+      const nx = this.playerX + dx * this.speed * dt;
+      const ny = this.playerY + dy * this.speed * dt;
+      // Map boundary (wall borders: top=65, sides=32, bottom=32)
+      const px = Math.max(32, Math.min(W - 32, nx));
+      const py = Math.max(65, Math.min(H - 32, ny));
+      // Block Elder's Alcove platform (x:60-240, y:118-218) — player walks around it
+      const inPlatformX = px > 55 && px < 245;
+      const inPlatformY = py > 113 && py < 223;
+      // Block Ward Stone pedestal (x:676-764, y:118-210)
+      const inPedestalX = px > 671 && px < 769;
+      const inPedestalY = py > 113 && py < 215;
+      this.playerX = (inPlatformX && inPlatformY) ? this.playerX : px;
+      this.playerY = (inPlatformX && inPlatformY) ? this.playerY :
+                     (inPedestalX && inPedestalY) ? this.playerY : py;
+      // Separate axis re-test for sliding along structure walls
+      const pxOnly = Math.max(32, Math.min(W - 32, this.playerX + dx * this.speed * dt));
+      const pyOnly = Math.max(65, Math.min(H - 32, this.playerY + dy * this.speed * dt));
+      const blockedX = (pxOnly > 55 && pxOnly < 245 && this.playerY > 113 && this.playerY < 223) ||
+                       (pxOnly > 671 && pxOnly < 769 && this.playerY > 113 && this.playerY < 215);
+      const blockedY = (this.playerX > 55 && this.playerX < 245 && pyOnly > 113 && pyOnly < 223) ||
+                       (this.playerX > 671 && this.playerX < 769 && pyOnly > 113 && pyOnly < 215);
+      if (!blockedX) this.playerX = pxOnly;
+      if (!blockedY) this.playerY = pyOnly;
       if (dx < 0) this.playerDir = 'left';
       else if (dx > 0) this.playerDir = 'right';
       else if (dy < 0) this.playerDir = 'up';
@@ -1317,7 +1465,7 @@ class ExploreManager {
           g.advanceQuest('trial_of_wards', 'speak_elder');
           g.startDialogue(npc.dialogueKey, () => { g.state = STATE.EXPLORE; });
         } else {
-          const afterKey = this.battleCount >= 2 ? 'npc_elder_ward' : 'npc_elder_ward_first';
+          const afterKey = this.battleCount >= 2 ? 'npc_elder_ward' : this.battleCount === 1 ? 'npc_elder_ward_one' : 'npc_elder_ward_first';
           g.startDialogue(afterKey, () => { g.state = STATE.EXPLORE; });
         }
         return;
@@ -2060,6 +2208,7 @@ class BattleManager {
     this.currentTurn = 0;
     this.phase = 'PLAYER_TURN'; // PLAYER_TURN, ENEMY_TURN, ANIMATING, VICTORY, DEFEAT
     this.fadeIn = 1.0;          // 1=black, 0=clear — fades to 0 over ~0.8s on battle start
+    this.showHint = game.party?.[0]?.level <= 1 && !game._battleHintShown; // show controls hint in first battle
     this.selectedAction = 0; // 0=Attack, 1=Ability, 2=Item, 3=Defend
     this.selectedTarget = 0;
     this.selectedAbility = 0;
@@ -2357,7 +2506,7 @@ class BattleManager {
 
   addLog(msg) {
     this.battleLog.push({ text: msg, timer: 3.0 });
-    if (this.battleLog.length > 6) this.battleLog.shift();
+    if (this.battleLog.length > 30) this.battleLog.shift();
   }
 
   // ─── Visual FX Spawners ───────────────────────────────────
@@ -2635,6 +2784,7 @@ class BattleManager {
   }
 
   executePlayerAttack() {
+    this.showHint = false; this.game._battleHintShown = true;
     const member = this.party[this.selectedMember];
     const targets = this.enemies.filter(e => e.currentHp > 0);
     const target = targets[this.selectedTarget];
@@ -3070,18 +3220,52 @@ class BattleManager {
       });
     }
 
-    // Battle log
-    const logX = W * 0.02, logY = H * 0.5;
-    const visibleLogs = this.battleLog.slice(-4);
+    // Battle log — shows last 5 entries, newest at bottom, colour-coded
+    const logMaxLines = 5, logLineH = 19;
+    const visibleLogs = this.battleLog.slice(-logMaxLines);
+    const logPanelH = logMaxLines * logLineH + 10;
+    const logX = W * 0.02, logY = H * 0.53 - logPanelH;
+    drawRoundedRect(ctx, logX - 6, logY - 4, 330, logPanelH, 5, 'rgba(0,0,0,0.55)', 'rgba(80,40,120,0.35)', 1);
     visibleLogs.forEach((log, i) => {
-      const alpha = i === visibleLogs.length - 1 ? 1 : 0.6 - (visibleLogs.length - 1 - i) * 0.15;
-      ctx.fillStyle = `rgba(0,0,0,${alpha * 0.5})`;
-      ctx.fillRect(logX - 4, logY + i * 22 - 14, 320, 20);
-      ctx.fillStyle = `rgba(220,200,255,${alpha})`;
-      ctx.font = '12px Georgia, serif';
+      const isNewest = i === visibleLogs.length - 1;
+      const age = visibleLogs.length - 1 - i;
+      const alpha = isNewest ? 1.0 : Math.max(0.3, 0.85 - age * 0.18);
+      // Colour by content
+      let color = `rgba(200,180,240,${alpha})`;
+      if (log.text.includes('Defeated')) color = `rgba(255,100,100,${alpha})`;
+      else if (log.text.includes('recovers') || log.text.includes('heal') || log.text.includes('restored')) color = `rgba(100,240,140,${alpha})`;
+      else if (log.text.includes('evades') || log.text.includes('MISS')) color = `rgba(180,180,180,${alpha})`;
+      else if (log.text.includes('⚔') || log.text.includes('begins')) color = `rgba(240,200,100,${alpha})`;
+      else if (log.text.includes('Critical') || log.text.includes('✨')) color = `rgba(255,240,80,${alpha})`;
+      else if (log.text.includes('burn') || log.text.includes('poison')) color = `rgba(255,140,60,${alpha})`;
+      ctx.fillStyle = color;
+      ctx.font = isNewest ? 'bold 11px Georgia, serif' : '11px Georgia, serif';
       ctx.textAlign = 'left';
-      ctx.fillText(log.text, logX, logY + i * 22);
+      ctx.fillText(log.text.length > 46 ? log.text.slice(0, 44) + '…' : log.text, logX, logY + i * logLineH + 14);
     });
+
+    // Turn order strip — top-right corner showing who acts next
+    {
+      const upNext = [];
+      const remaining = this.turnOrder.filter(c => c.currentHp > 0 || (c.isPlayer ? this.party.find(m=>m.id===c.id)?.currentHp > 0 : this.enemies.find(e=>(e.id||e.name)===(c.id||c.name))?.currentHp > 0));
+      for (let i = 1; i <= Math.min(3, remaining.length); i++) {
+        const c = this.turnOrder[(this.currentTurn + i) % this.turnOrder.length];
+        if (c) upNext.push(c);
+      }
+      const stripX = W - 130, stripY = 8;
+      drawRoundedRect(ctx, stripX, stripY, 122, 20 + upNext.length * 20, 5, 'rgba(0,0,10,0.7)', 'rgba(80,40,120,0.5)', 1);
+      ctx.fillStyle = 'rgba(140,100,200,0.8)';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('NEXT UP:', stripX + 6, stripY + 13);
+      upNext.forEach((c, i) => {
+        const name = c.isPlayer ? (this.party.find(m=>m.id===c.id)?.name||c.name||'?').split(' ')[0]
+                                 : (this.enemies.find(e=>(e.id||e.name)===(c.id||c.name))?.name||c.name||'?').split(' ')[0];
+        ctx.fillStyle = c.isPlayer ? 'rgba(160,220,255,0.85)' : 'rgba(255,160,140,0.85)';
+        ctx.font = '9px monospace';
+        ctx.fillText(`${c.isPlayer ? '▸' : '▸'} ${name}`, stripX + 6, stripY + 13 + (i+1)*18);
+      });
+    }
 
     // Enemy turn indicator — animated pulse
     if (this.phase === 'ENEMY_TURN') {
@@ -3104,6 +3288,23 @@ class BattleManager {
     if (this.fadeIn > 0) {
       ctx.fillStyle = `rgba(0,0,0,${this.fadeIn})`;
       ctx.fillRect(0, 0, W, H);
+    }
+
+    // ── First-battle controls hint ────────────────────────────
+    if (this.showHint && this.phase === 'PLAYER_TURN' && this.fadeIn <= 0) {
+      const hx = W/2 - 220, hy = H * 0.56;
+      drawRoundedRect(ctx, hx, hy, 440, 80, 8, 'rgba(0,0,20,0.88)', 'rgba(200,160,80,0.6)', 1);
+      ctx.fillStyle = '#f0d080';
+      ctx.font = 'bold 11px Cinzel, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('BATTLE CONTROLS', W/2, hy + 16);
+      ctx.fillStyle = '#c0a0e0';
+      ctx.font = '11px monospace';
+      ctx.fillText('↑↓ Select action    Enter/Z Confirm    X/Esc Cancel', W/2, hy + 36);
+      ctx.fillText('Click enemy portrait to target    Click action to select', W/2, hy + 52);
+      ctx.fillStyle = 'rgba(200,160,80,0.5)';
+      ctx.font = '10px Georgia';
+      ctx.fillText('(This message disappears when you act)', W/2, hy + 70);
     }
   }
 

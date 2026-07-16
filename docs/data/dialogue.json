@@ -26,21 +26,33 @@
       "text": "Don't worry, Elder. Chaos is my greatest weapon. Lead the way."
     }
   ],
-  "npc_elder_ward": [
+  "npc_elder_ward_one": [
     {
       "speaker": "Elder Ward",
       "portrait": null,
-      "text": "The Warding Grounds lie ahead. Three guardian beasts stand between you and the Ward Stone."
-    },
-    {
-      "speaker": "Elder Ward",
-      "portrait": null,
-      "text": "Defeat them, and the stone is yours. The wards — and all of us — are counting on you."
+      "text": "One guardian falls — but another still roams the southern floor. Seek it out."
     },
     {
       "speaker": "Motley Max",
       "portrait": "assets/characters/motley_max.png",
-      "text": "Two beasts down, one to go. Let's finish this!"
+      "text": "Already warmed up. Let's keep the momentum!"
+    }
+  ],
+  "npc_elder_ward": [
+    {
+      "speaker": "Elder Ward",
+      "portrait": null,
+      "text": "Both guardians are defeated. But I sense a greater presence — the Flame Guardian stirs near the eastern wall."
+    },
+    {
+      "speaker": "Elder Ward",
+      "portrait": null,
+      "text": "Defeat the Blaze Lion, then approach the Ward Stone. The wards — and all of us — are counting on you."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "One beast of flame between me and glory? Perfect."
     }
   ],
   "npc_elder_ward_first": [
