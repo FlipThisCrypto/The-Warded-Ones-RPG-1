@@ -4,7 +4,7 @@
 'use strict';
 
 // ─── Constants ────────────────────────────────────────────────
-const GAME_VERSION = '0.1.0';
+const GAME_VERSION = '0.2.0';
 const SAVE_KEY = 'warded_ones_save_v1';
 
 // ─── Game State Machine ───────────────────────────────────────
@@ -1367,9 +1367,18 @@ class BattleManager {
     this.logTimer = 0;
     this.animTimer = 0;
     this.shakeX = 0;
+    this.shakeY = 0;
     this.pendingAction = null;
     this.rewards = null;
     this.levelUps = [];
+
+    // ── Visual FX ─────────────────────────────────────────────
+    this.floatingTexts = [];       // damage/heal numbers that drift up
+    this.hitFlashes = {};          // id → flash intensity 0–1
+    this.actionAnnounce = null;    // { text, timer, maxTimer, color }
+    this.victoryParticles = [];    // burst on win
+    this.enemyPositions = [];      // set each render frame, used by fx spawners
+    this.partyPositions = [];
 
     this.buildTurnOrder();
     this.addLog(`⚔ Battle begins!`);
@@ -1480,7 +1489,16 @@ class BattleManager {
     }
 
     this.addLog(`${actor.name} uses ${abilityDef.name}!`);
-    this.game.audio.playAttack();
+
+    // Announce ability name for player actions
+    if (isPlayer) {
+      const abilityColors = { attack: '#ff8060', magic: '#c060ff', heal: '#60ff80', drain: '#a040ff', debuff: '#ffb040', buff: '#60d0ff', control: '#ff60ff' };
+      const col = abilityColors[abilityDef.type] || '#f0d080';
+      this.setActionAnnounce(abilityDef.name.toUpperCase(), col);
+      this.game.audio.playMagic();
+    } else {
+      this.game.audio.playAttack();
+    }
 
     const hits = abilityDef.hits || 1;
     targets.forEach(target => {
@@ -1493,11 +1511,21 @@ class BattleManager {
   }
 
   resolveHit(actor, target, abilityDef, isPlayer) {
+    // Helper: get screen position for a combatant
+    const getPos = (t) => {
+      const ep = this.enemyPositions.find(p => p.id === t.id);
+      const pp = this.partyPositions.find(p => p.id === t.id);
+      return ep || pp || { x: 450, y: 200 };
+    };
+
     if (abilityDef.type === 'heal') {
       const heal = abilityDef.power + (actor.stats?.lck || 0) * 0.5;
       target.currentHp = Math.min(target.stats.hp, target.currentHp + heal);
-      this.addLog(`${target.name} recovers ${Math.floor(heal)} HP!`);
+      const healAmt = Math.floor(heal);
+      this.addLog(`${target.name} recovers ${healAmt} HP!`);
       this.game.audio.playHeal();
+      const pos = getPos(target);
+      this.spawnFloat(pos.x, pos.y - 30, `+${healAmt}`, '#60ff80');
       return;
     }
 
@@ -1506,6 +1534,10 @@ class BattleManager {
       target.currentHp = Math.max(0, target.currentHp - dmg);
       actor.currentHp = Math.min(actor.stats.hp, actor.currentHp + Math.floor(dmg * 0.5));
       this.addLog(`${target.name} takes ${dmg} damage! ${actor.name} absorbs ${Math.floor(dmg*0.5)} HP!`);
+      const tPos = getPos(target);
+      this.spawnFloat(tPos.x, tPos.y - 30, dmg, '#c060ff');
+      this.spawnHitFlash(target.id);
+      this.shakeX = 5; this.shakeY = 3;
       return;
     }
 
@@ -1513,13 +1545,19 @@ class BattleManager {
       target.statusEffects = target.statusEffects || [];
       target.statusEffects.push({ type: 'evade', duration: 1 });
       this.addLog(`${target.name} is ready to evade!`);
+      const pos = getPos(target);
+      this.spawnFloat(pos.x, pos.y - 30, 'EVADE+', '#60d0ff');
       return;
     }
 
     if (abilityDef.type === 'debuff') {
       target.statusEffects = target.statusEffects || [];
       target.statusEffects.push({ type: abilityDef.effect, duration: abilityDef.effect_duration || 2 });
+      const statusLabels = { atk_down: 'ATK↓', spd_down: 'SPD↓', confuse: 'CONFUSE', burn: 'BURN!', freeze: 'FREEZE!' };
+      const label = statusLabels[abilityDef.effect] || abilityDef.effect.toUpperCase();
       this.addLog(`${target.name} is ${abilityDef.effect}!`);
+      const pos = getPos(target);
+      this.spawnFloat(pos.x, pos.y - 30, label, '#ffb040');
       return;
     }
 
@@ -1531,7 +1569,11 @@ class BattleManager {
       const blocked = Math.min(target.shieldAmount, dmg);
       dmg -= blocked;
       target.shieldAmount -= blocked;
-      if (blocked > 0) this.addLog(`${target.name}'s ward absorbs ${blocked}!`);
+      if (blocked > 0) {
+        this.addLog(`${target.name}'s ward absorbs ${blocked}!`);
+        const pos = getPos(target);
+        this.spawnFloat(pos.x, pos.y - 50, `WARD-${blocked}`, '#8080ff');
+      }
     }
 
     // Apply defend
@@ -1542,19 +1584,38 @@ class BattleManager {
     if (evadeEffect && Math.random() < 0.7) {
       this.addLog(`${target.name} evades the attack!`);
       target.statusEffects = target.statusEffects.filter(e => e !== evadeEffect);
+      const pos = getPos(target);
+      this.spawnFloat(pos.x, pos.y - 30, 'MISS', '#a0a0a0');
       return;
     }
 
+    const prevHp = target.currentHp;
     target.currentHp = Math.max(0, target.currentHp - dmg);
-    this.addLog(`${target.name} takes ${dmg} damage!${target.currentHp <= 0 ? ' Defeated!' : ''}`);
+    const defeated = target.currentHp <= 0 && prevHp > 0;
+    this.addLog(`${target.name} takes ${dmg} damage!${defeated ? ' Defeated!' : ''}`);
     this.game.audio.playHit();
-    this.shakeX = 8;
+
+    // Shake: heavier for big hits
+    const shakeMag = Math.min(12, 4 + dmg * 0.15);
+    this.shakeX = shakeMag;
+    this.shakeY = shakeMag * 0.5;
+
+    // Hit flash on target
+    this.spawnHitFlash(target.id || target.name);
+
+    // Floating damage number — color by context
+    const pos = getPos(target);
+    const isCrit = abilityDef.effect === 'random_power' && dmg > 30;
+    const numColor = defeated ? '#ff4040' : isCrit ? '#ffee00' : isPlayer ? '#ff8060' : '#ff4040';
+    this.spawnFloat(pos.x, pos.y - 40, dmg, numColor, isCrit || defeated);
 
     // Apply status effect from attack
     if (abilityDef.effect && abilityDef.type === 'attack' && Math.random() < 0.6) {
       target.statusEffects = target.statusEffects || [];
       target.statusEffects.push({ type: abilityDef.effect, duration: abilityDef.effect_duration || 2 });
+      const statusLabels = { burn: 'BURN!', freeze: 'FREEZE!', confuse: 'CONFUSE', atk_down: 'ATK↓' };
       this.addLog(`${target.name} is ${abilityDef.effect}!`);
+      this.spawnFloat(pos.x + 20, pos.y - 60, statusLabels[abilityDef.effect] || '!', '#ffb040');
     }
   }
 
@@ -1582,6 +1643,135 @@ class BattleManager {
     if (this.battleLog.length > 6) this.battleLog.shift();
   }
 
+  // ─── Visual FX Spawners ───────────────────────────────────
+  spawnFloat(x, y, text, color = '#ffffff', big = false) {
+    this.floatingTexts.push({
+      x: x + (Math.random() - 0.5) * 30,
+      y,
+      text: String(text),
+      color,
+      life: 1.0,
+      vy: -(60 + Math.random() * 40),
+      size: big ? 28 : 20,
+    });
+  }
+
+  spawnHitFlash(targetId) {
+    this.hitFlashes[targetId] = 1.0;
+  }
+
+  spawnVictoryBurst(cx, cy) {
+    const colors = ['#f0d060', '#d080ff', '#60e0ff', '#ff8060', '#80ff80'];
+    for (let i = 0; i < 60; i++) {
+      const angle = (Math.PI * 2 * i) / 60 + Math.random() * 0.2;
+      const speed = 80 + Math.random() * 200;
+      this.victoryParticles.push({
+        x: cx, y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 80,
+        life: 1.0,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: 2 + Math.random() * 5,
+      });
+    }
+  }
+
+  setActionAnnounce(text, color = '#f0d080') {
+    this.actionAnnounce = { text, timer: 1.2, maxTimer: 1.2, color };
+  }
+
+  // ─── FX Update ────────────────────────────────────────────
+  updateFx(dt) {
+    // Floating texts
+    this.floatingTexts = this.floatingTexts.filter(ft => {
+      ft.y += ft.vy * dt;
+      ft.vy *= 0.92;
+      ft.life -= dt * 1.2;
+      return ft.life > 0;
+    });
+
+    // Hit flashes
+    Object.keys(this.hitFlashes).forEach(id => {
+      this.hitFlashes[id] -= dt * 5;
+      if (this.hitFlashes[id] <= 0) delete this.hitFlashes[id];
+    });
+
+    // Action announce
+    if (this.actionAnnounce) {
+      this.actionAnnounce.timer -= dt;
+      if (this.actionAnnounce.timer <= 0) this.actionAnnounce = null;
+    }
+
+    // Victory particles
+    this.victoryParticles = this.victoryParticles.filter(p => {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 120 * dt; // gravity
+      p.life -= dt * 0.8;
+      return p.life > 0;
+    });
+
+    // Shake decay
+    if (this.shakeX > 0.2) this.shakeX *= 0.75; else this.shakeX = 0;
+    if (this.shakeY > 0.2) this.shakeY *= 0.75; else this.shakeY = 0;
+  }
+
+  // ─── FX Render ────────────────────────────────────────────
+  renderFx(ctx) {
+    // Floating texts
+    this.floatingTexts.forEach(ft => {
+      const alpha = Math.min(1, ft.life * 1.5);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = `bold ${ft.size}px 'Cinzel', Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(ft.text, ft.x, ft.y);
+      ctx.fillStyle = ft.color;
+      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.restore();
+    });
+
+    // Action announce (centered, fades in and out)
+    if (this.actionAnnounce) {
+      const a = this.actionAnnounce;
+      const progress = a.timer / a.maxTimer;
+      // Fade in first 0.2, hold, fade out last 0.3
+      let alpha = 1;
+      if (progress > 0.8) alpha = (1 - progress) / 0.2;
+      else if (progress < 0.3) alpha = progress / 0.3;
+
+      const canvas = ctx.canvas;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.textAlign = 'center';
+      ctx.font = `bold 26px 'Cinzel', Georgia, serif`;
+      const tw = ctx.measureText(a.text).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(canvas.width / 2 - tw / 2 - 16, canvas.height * 0.44 - 26, tw + 32, 40);
+      ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+      ctx.lineWidth = 4;
+      ctx.strokeText(a.text, canvas.width / 2, canvas.height * 0.44);
+      ctx.fillStyle = a.color;
+      ctx.shadowColor = a.color;
+      ctx.shadowBlur = 15;
+      ctx.fillText(a.text, canvas.width / 2, canvas.height * 0.44);
+      ctx.restore();
+    }
+
+    // Victory particles
+    this.victoryParticles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
   checkBattleEnd() {
     const allEnemiesDead = this.enemies.every(e => e.currentHp <= 0);
     const allPartyDead = this.party.every(m => m.currentHp <= 0);
@@ -1591,6 +1781,9 @@ class BattleManager {
       this.calcRewards();
       this.game.state = STATE.VICTORY;
       this.game.audio.playVictory();
+      const canvas = document.getElementById('game-canvas');
+      this.spawnVictoryBurst(canvas.width / 2, canvas.height * 0.35);
+      this.setActionAnnounce('VICTORY!', '#f0d060');
       return true;
     }
     if (allPartyDead) {
@@ -1633,8 +1826,8 @@ class BattleManager {
 
   update(dt) {
     this.logTimer += dt;
-    if (this.shakeX > 0) this.shakeX *= 0.8;
     this.animTimer += dt;
+    this.updateFx(dt);
   }
 
   // ─── Battle Input ─────────────────────────────────────────
@@ -1706,10 +1899,16 @@ class BattleManager {
       target.shieldAmount -= blocked;
     }
     const effectiveDmg = target.defending ? Math.floor(dmg * 0.5) : dmg;
+    const prevHp = target.currentHp;
     target.currentHp = Math.max(0, target.currentHp - effectiveDmg);
-    this.addLog(`${member.name} attacks ${target.name} for ${effectiveDmg}!`);
+    const defeated = target.currentHp <= 0 && prevHp > 0;
+    this.addLog(`${member.name} attacks ${target.name} for ${effectiveDmg}!${defeated ? ' Defeated!' : ''}`);
     this.game.audio.playAttack();
-    this.shakeX = 6;
+    this.shakeX = 6; this.shakeY = 3;
+    this.spawnHitFlash(target.id || target.name);
+    const ePos = this.enemyPositions.find(p => p.id === (target.id || target.name));
+    if (ePos) this.spawnFloat(ePos.x, ePos.y - 40, effectiveDmg, defeated ? '#ff4040' : '#ff8060', defeated);
+    this.setActionAnnounce('ATTACK', '#ff8060');
     this.subMenu = null;
 
     if (!this.checkBattleEnd()) this.endPlayerTurn();
@@ -1829,22 +2028,49 @@ class BattleManager {
       ctx.fillRect(0, 0, W, H);
     }
 
+    // Screen shake — applied to the enemy area only (leaves UI stable)
+    const shakeOffX = this.shakeX > 0 ? (Math.random() - 0.5) * this.shakeX * 2 : 0;
+    const shakeOffY = this.shakeY > 0 ? (Math.random() - 0.5) * this.shakeY * 2 : 0;
+
+    // Reset position tracking each frame
+    this.enemyPositions = [];
+    this.partyPositions = [];
+
     // Enemies
-    const aliveEnemies = this.enemies.filter(e => e.currentHp > 0);
-    const numE = aliveEnemies.length;
-    aliveEnemies.forEach((e, i) => {
+    const allEnemies = this.enemies; // render dead too (ghosted)
+    const numE = this.enemies.length;
+    allEnemies.forEach((e, i) => {
       const ex = W * (0.3 + (i - (numE-1)/2) * 0.25);
       const ey = H * 0.25;
       const es = Math.min(W * 0.28, 200);
 
+      // Store position for FX
+      this.enemyPositions.push({ id: e.id || e.name, x: ex, y: ey });
+
+      const isDead = e.currentHp <= 0;
       const portrait = this.game.images[e.portrait];
+      const flashIntensity = this.hitFlashes[e.id || e.name] || 0;
+
       if (portrait) {
         ctx.save();
-        if (this.shakeX > 0 && this.subMenu === null) ctx.translate(Math.random() * this.shakeX * 2 - this.shakeX, 0);
-        ctx.globalAlpha = e.currentHp <= 0 ? 0.3 : 1;
+        // Shake only living enemies
+        if (!isDead && (shakeOffX !== 0 || shakeOffY !== 0)) {
+          ctx.translate(shakeOffX, shakeOffY);
+        }
+        ctx.globalAlpha = isDead ? 0.25 : 1;
         ctx.drawImage(portrait, ex - es/2, ey - es/2, es, es);
+
+        // Hit flash — white overlay composite
+        if (flashIntensity > 0) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = `rgba(255,200,200,${flashIntensity * 0.6})`;
+          ctx.fillRect(ex - es/2, ey - es/2, es, es);
+          ctx.globalCompositeOperation = 'source-over';
+        }
         ctx.restore();
       }
+
+      if (isDead) return; // skip UI for dead enemies
 
       // Enemy HP bar
       const barW = 140, barH = 10;
@@ -1859,13 +2085,17 @@ class BattleManager {
       const targets = this.enemies.filter(en => en.currentHp > 0);
       const tIdx = targets.indexOf(e);
       if ((this.subMenu === 'target' || this.subMenu === 'ability_target') && tIdx === this.selectedTarget) {
-        ctx.strokeStyle = '#f0c060';
+        // Pulsing selection ring
+        const pulse = 0.7 + Math.sin(this.animTimer * 6) * 0.3;
+        ctx.strokeStyle = `rgba(240,192,96,${pulse})`;
         ctx.lineWidth = 3;
         ctx.strokeRect(ex - es/2 - 4, ey - es/2 - 4, es + 8, es + 8);
         ctx.fillStyle = '#f0c060';
-        ctx.font = 'bold 16px Georgia';
+        ctx.font = 'bold 20px Georgia';
         ctx.textAlign = 'center';
-        ctx.fillText('▾', ex, ey - es/2 - 10);
+        // Bouncing arrow
+        const bounce = Math.sin(this.animTimer * 8) * 4;
+        ctx.fillText('▾', ex, ey - es/2 - 8 + bounce);
       }
 
       // Enemy name + HP
@@ -1879,10 +2109,10 @@ class BattleManager {
 
       // Status icons
       if (e.statusEffects?.length) {
-        ctx.font = '12px serif';
+        ctx.font = '14px serif';
         e.statusEffects.forEach((se, si) => {
-          const icons = { burn: '🔥', freeze: '❄', confuse: '💫', poison: '☠', atk_down: '⬇', spd_down: '🐢' };
-          ctx.fillText(icons[se.type] || '?', ex - 20 + si * 18, ey - es/2 - 25);
+          const icons = { burn: '🔥', freeze: '❄️', confuse: '💫', poison: '☠️', atk_down: '⬇️', spd_down: '🐢' };
+          ctx.fillText(icons[se.type] || '✦', ex - 20 + si * 22, ey - es/2 - 20);
         });
       }
     });
@@ -1899,8 +2129,11 @@ class BattleManager {
       const py = partyY;
       const isCurrent = i === this.selectedMember && this.phase === 'PLAYER_TURN';
 
-      const portrait = this.game.images[m.portrait];
+      // Store position for FX (center of portrait)
       const pSize = 68;
+      this.partyPositions.push({ id: m.id || m.name, x: px + pSize / 2, y: py + pSize / 2 });
+
+      const portrait = this.game.images[m.portrait];
       if (portrait) {
         ctx.save();
         ctx.globalAlpha = m.currentHp <= 0 ? 0.3 : 1;
@@ -2045,15 +2278,22 @@ class BattleManager {
       ctx.fillText(log.text, logX, logY + i * 22);
     });
 
-    // Enemy turn indicator
+    // Enemy turn indicator — animated pulse
     if (this.phase === 'ENEMY_TURN') {
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      const pulse = 0.5 + Math.sin(this.animTimer * 8) * 0.2;
+      ctx.fillStyle = `rgba(0,0,0,${pulse * 0.6})`;
       ctx.fillRect(0, H * 0.42, W, 36);
       ctx.fillStyle = '#ff8080';
       ctx.font = 'bold 18px Cinzel, serif';
       ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(255,80,80,0.5)';
+      ctx.shadowBlur = 10;
       ctx.fillText('Enemy Turn...', W/2, H * 0.42 + 24);
+      ctx.shadowBlur = 0;
     }
+
+    // ── FX layer (drawn last, above everything) ──────────────
+    this.renderFx(ctx);
   }
 
   renderVictory(ctx, canvas) {
@@ -2065,6 +2305,7 @@ class BattleManager {
     ctx.fillRect(0, 0, W, H);
 
     this.game.renderParticles(ctx);
+    this.renderFx(ctx); // victory particle burst
 
     const boxW = 500, boxH = 360;
     const bx = (W - boxW)/2, by = (H - boxH)/2;
