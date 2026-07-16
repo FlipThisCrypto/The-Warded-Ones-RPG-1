@@ -3045,20 +3045,30 @@ class BattleManager {
 
     const member = this.party[this.selectedMember];
     let used = false;
+    
+    // Find member position for visual FX
+    const mPos = this.partyPositions.find(p => p.id === (member.id || member.name)) || { x: 100, y: 450 };
 
     if (def.effect === 'heal_hp') {
       member.currentHp = Math.min(member.stats.hp, member.currentHp + def.value);
       this.addLog(`${member.name} uses ${def.name} and recovers ${def.value} HP!`);
       this.game.audio.playHeal();
+      this.spawnFloat(mPos.x, mPos.y - 30, `+${def.value} HP`, '#50ff50');
+      this.spawnBattleParticles(mPos.x, mPos.y, '#50ff50', 15);
       used = true;
     } else if (def.effect === 'restore_mp') {
       member.currentMp = Math.min(member.stats.mp, member.currentMp + def.value);
       this.addLog(`${member.name} uses ${def.name} and recovers ${def.value} MP!`);
       this.game.audio.playMagic();
+      this.spawnFloat(mPos.x, mPos.y - 30, `+${def.value} MP`, '#00f0ff');
+      this.spawnBattleParticles(mPos.x, mPos.y, '#00f0ff', 15);
       used = true;
     } else if (def.effect === 'shield') {
       member.shieldAmount = (member.shieldAmount || 0) + def.value;
       this.addLog(`${member.name} uses ${def.name}! Shield: ${member.shieldAmount}`);
+      this.game.audio.playMagic();
+      this.spawnFloat(mPos.x, mPos.y - 30, `SHIELD +${def.value}`, '#ffffaa');
+      this.spawnBattleParticles(mPos.x, mPos.y, '#ffffaa', 15);
       used = true;
     } else if (def.effect === 'full_heal') {
       member.currentHp = member.stats.hp;
@@ -3066,13 +3076,20 @@ class BattleManager {
       member.statusEffects = [];
       this.addLog(`${member.name} is fully restored!`);
       this.game.audio.playHeal();
+      this.spawnFloat(mPos.x, mPos.y - 30, 'RESTORED', '#80ffcc');
+      this.spawnBattleParticles(mPos.x, mPos.y, '#80ffcc', 20);
       used = true;
     } else if (def.effect === 'revive') {
       if (member.currentHp <= 0) {
         member.currentHp = Math.floor(member.stats.hp * (def.value / 100));
         this.addLog(`${member.name} is revived with ${member.currentHp} HP!`);
         this.game.audio.playHeal();
+        this.spawnFloat(mPos.x, mPos.y - 30, 'REVIVED', '#ffffff');
+        this.spawnBattleParticles(mPos.x, mPos.y, ['#ffffff', '#ffd700'], 20);
         used = true;
+      } else {
+        this.addLog(`${member.name} is not KO'd!`);
+        this.game.audio.playCancel();
       }
     }
 
