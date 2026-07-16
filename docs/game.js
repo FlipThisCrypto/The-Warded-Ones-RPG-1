@@ -2987,6 +2987,18 @@ class BattleManager {
           ctx.fillStyle = `rgba(255,200,200,${flashIntensity * 0.6})`;
           ctx.fillRect(ex - es/2, ey - es/2, es, es);
           ctx.globalCompositeOperation = 'source-over';
+
+          // Slash marks
+          ctx.strokeStyle = `rgba(255, 50, 50, ${flashIntensity})`;
+          ctx.lineWidth = 4 * flashIntensity;
+          ctx.beginPath();
+          ctx.moveTo(ex - es/2 + 20, ey - es/2 + 20);
+          ctx.lineTo(ex + es/2 - 20, ey + es/2 - 20);
+          if (flashIntensity > 0.5) {
+            ctx.moveTo(ex + es/2 - 20, ey - es/2 + 20);
+            ctx.lineTo(ex - es/2 + 20, ey + es/2 - 20);
+          }
+          ctx.stroke();
         }
         ctx.restore();
       }
@@ -3083,6 +3095,26 @@ class BattleManager {
         ctx.clip();
         ctx.drawImage(portrait, px, py, pSize, pSize);
         ctx.restore();
+
+        // Flash and slash overlays for player characters
+        const flashIntensity = this.hitFlashes[mid] || 0;
+        if (flashIntensity > 0) {
+          ctx.save();
+          ctx.translate(mlox + mhbx, mloy + mhby);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = `rgba(255,200,200,${flashIntensity * 0.6})`;
+          ctx.fillRect(px, py, pSize, pSize);
+          ctx.globalCompositeOperation = 'source-over';
+
+          // Slash
+          ctx.strokeStyle = `rgba(255, 50, 50, ${flashIntensity})`;
+          ctx.lineWidth = 3 * flashIntensity;
+          ctx.beginPath();
+          ctx.moveTo(px + 10, py + 10);
+          ctx.lineTo(px + pSize - 10, py + pSize - 10);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
       // Highlight current
