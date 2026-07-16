@@ -1562,6 +1562,52 @@ class ExploreManager {
     // ── Layer 10: HUD ────────────────────────────────────────
     this.game.ui.renderHUD(ctx, canvas);
     this.renderPartyStatus(ctx, canvas);
+    this._renderMinimap(ctx, canvas);
+  }
+
+  _renderMinimap(ctx, canvas) {
+    const W = canvas.width, H = canvas.height;
+    const mmW = 110, mmH = 80;
+    const mmX = 24, mmY = H - mmH - 24;
+
+    // Outer frame with dark purple theme and cyan glow border
+    drawRoundedRect(ctx, mmX, mmY, mmW, mmH, 8, 'rgba(8, 4, 24, 0.85)', 'rgba(0, 240, 255, 0.4)', 1.5);
+    
+    // Scale factor
+    const scaleX = mmW / W;
+    const scaleY = mmH / H;
+
+    // Draw active encounter zones (red circles)
+    this.encounter_zones.forEach(zone => {
+      if (zone.used) return;
+      ctx.fillStyle = 'rgba(255, 60, 60, 0.35)';
+      ctx.beginPath();
+      ctx.arc(mmX + zone.x * scaleX, mmY + zone.y * scaleY, zone.r * scaleX, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Draw Ward Stone pedestal (purple diamond)
+    ctx.fillStyle = 'rgba(200, 160, 255, 0.7)';
+    ctx.fillRect(mmX + 720 * scaleX - 4, mmY + 148 * scaleY - 4, 8, 8);
+
+    // Draw Elder Ward NPC (blue dot)
+    ctx.fillStyle = '#80d0ff';
+    ctx.beginPath();
+    ctx.arc(mmX + 148 * scaleX, mmY + 170 * scaleY, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw Player (pulsing yellow dot)
+    const pulse = 1.0 + Math.sin(this.game.animTimer * 10) * 0.25;
+    ctx.fillStyle = '#f5e01d';
+    ctx.beginPath();
+    ctx.arc(mmX + this.playerX * scaleX, mmY + this.playerY * scaleY, 3.5 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Small HUD Label
+    ctx.fillStyle = 'rgba(150, 120, 200, 0.6)';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('MINIMAP', mmX + 4, mmY + mmH - 4);
   }
 
   // ── Floor ─────────────────────────────────────────────────
