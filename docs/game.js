@@ -1945,6 +1945,9 @@ class BattleManager {
     this.victoryParticles = [];    // burst on win
     this.enemyPositions = [];      // set each render frame, used by fx spawners
     this.partyPositions = [];
+    this.lungeOffsets = {};        // id → { dx, dy, life 0→1 }
+    this.hitBounces = {};          // id → { dx, dy, life 0→1 }
+    this.deathFades = {};          // id → alpha 1→0
 
     this.buildTurnOrder();
     this.addLog(`⚔ Battle begins!`);
@@ -2166,8 +2169,19 @@ class BattleManager {
     this.shakeX = shakeMag;
     this.shakeY = shakeMag * 0.5;
 
-    // Hit flash on target
+    // Hit flash + bounce on target
     this.spawnHitFlash(target.id || target.name);
+
+    // Lunge: actor charges toward target
+    const actorId = actor.id || actor.name;
+    if (isPlayer) {
+      this.spawnLunge(actorId, 30, -20);   // party member lunges up-right
+    } else {
+      this.spawnLunge(actorId, -35, 10);   // enemy lunges left toward party
+    }
+
+    // Death fade when defeated
+    if (defeated) this.spawnDeathFade(target.id || target.name);
 
     // Floating damage number — color by context
     const pos = getPos(target);
@@ -2224,6 +2238,18 @@ class BattleManager {
 
   spawnHitFlash(targetId) {
     this.hitFlashes[targetId] = 1.0;
+    // Hit bounce — target jerks back from the impact direction
+    this.hitBounces[targetId] = { dx: 14, dy: -6, life: 1.0 };
+  }
+
+  spawnLunge(actorId, dx, dy) {
+    this.lungeOffsets[actorId] = { dx, dy, life: 1.0 };
+  }
+
+  spawnDeathFade(targetId) {
+    if (!(targetId in this.deathFades)) {
+      this.deathFades[targetId] = 1.0;
+    }
   }
 
   spawnVictoryBurst(cx, cy) {
@@ -2280,6 +2306,24 @@ class BattleManager {
     // Shake decay
     if (this.shakeX > 0.2) this.shakeX *= 0.75; else this.shakeX = 0;
     if (this.shakeY > 0.2) this.shakeY *= 0.75; else this.shakeY = 0;
+
+    // Lunge decay (0.25s total: out on first half, back on second)
+    Object.keys(this.lungeOffsets).forEach(id => {
+      this.lungeOffsets[id].life -= dt * 4;
+      if (this.lungeOffsets[id].life <= 0) delete this.lungeOffsets[id];
+    });
+
+    // Hit bounce decay (0.2s)
+    Object.keys(this.hitBounces).forEach(id => {
+      this.hitBounces[id].life -= dt * 5;
+      if (this.hitBounces[id].life <= 0) delete this.hitBounces[id];
+    });
+
+    // Death fade (0.7s)
+    Object.keys(this.deathFades).forEach(id => {
+      this.deathFades[id] -= dt * 1.4;
+      if (this.deathFades[id] <= 0) delete this.deathFades[id];
+    });
   }
 
   // ─── FX Render ────────────────────────────────────────────
@@ -2472,6 +2516,8 @@ class BattleManager {
     this.game.audio.playAttack();
     this.shakeX = 6; this.shakeY = 3;
     this.spawnHitFlash(target.id || target.name);
+    this.spawnLunge(member.id || member.name, 30, -20); // party lunges up-right toward enemies
+    if (defeated) this.spawnDeathFade(target.id || target.name);
     const ePos = this.enemyPositions.find(p => p.id === (target.id || target.name));
     if (ePos) this.spawnFloat(ePos.x, ePos.y - 40, effectiveDmg, defeated ? '#ff4040' : '#ff8060', defeated);
     this.setActionAnnounce('ATTACK', '#ff8060');
@@ -2618,14 +2664,33 @@ class BattleManager {
       const isDead = e.currentHp <= 0;
       const portrait = this.game.images[e.portrait];
       const flashIntensity = this.hitFlashes[e.id || e.name] || 0;
+      const eid = e.id || e.name;
+
+      // Compute animation offsets
+      const lo = this.lungeOffsets[eid];
+      let lox = 0, loy = 0;
+      if (lo) {
+        const t = 1 - lo.life; // 0→1 over anim
+        const ping = t < 0.5 ? t * 2 : (1 - t) * 2; // ping-pong 0→1→0
+        lox = lo.dx * ping;
+        loy = lo.dy * ping;
+      }
+
+      const hb = this.hitBounces[eid];
+      let hbx = 0, hby = 0;
+      if (hb) { hbx = hb.dx * hb.life; hby = hb.dy * hb.life; }
+
+      // Death fade alpha
+      const fadeAlpha = eid in this.deathFades ? this.deathFades[eid] : (isDead ? 0 : 1);
+      const dropY = isDead && !(eid in this.deathFades) ? 0 : (1 - fadeAlpha) * 30;
 
       if (portrait) {
         ctx.save();
-        // Shake only living enemies
         if (!isDead && (shakeOffX !== 0 || shakeOffY !== 0)) {
           ctx.translate(shakeOffX, shakeOffY);
         }
-        ctx.globalAlpha = isDead ? 0.25 : 1;
+        ctx.translate(lox + hbx, loy + hby + dropY);
+        ctx.globalAlpha = isDead ? Math.max(0, fadeAlpha) : 1;
         ctx.drawImage(portrait, ex - es/2, ey - es/2, es, es);
 
         // Hit flash — white overlay composite
@@ -2638,7 +2703,8 @@ class BattleManager {
         ctx.restore();
       }
 
-      if (isDead) return; // skip UI for dead enemies
+      if (isDead && !(eid in this.deathFades)) return; // skip UI for fully-settled dead enemies
+      if (isDead) return; // still fading — skip HP bar etc
 
       // Enemy HP bar
       const barW = 140, barH = 10;
@@ -2701,9 +2767,24 @@ class BattleManager {
       const pSize = 68;
       this.partyPositions.push({ id: m.id || m.name, x: px + pSize / 2, y: py + pSize / 2 });
 
+      // Party member animation offsets
+      const mid = m.id || m.name;
+      const mlo = this.lungeOffsets[mid];
+      let mlox = 0, mloy = 0;
+      if (mlo) {
+        const t = 1 - mlo.life;
+        const ping = t < 0.5 ? t * 2 : (1 - t) * 2;
+        mlox = mlo.dx * ping;
+        mloy = mlo.dy * ping;
+      }
+      const mhb = this.hitBounces[mid];
+      let mhbx = 0, mhby = 0;
+      if (mhb) { mhbx = -mhb.dx * mhb.life; mhby = mhb.dy * mhb.life; } // bounce right (away from enemies)
+
       const portrait = this.game.images[m.portrait];
       if (portrait) {
         ctx.save();
+        ctx.translate(mlox + mhbx, mloy + mhby);
         ctx.globalAlpha = m.currentHp <= 0 ? 0.3 : 1;
         if (isCurrent) {
           ctx.shadowColor = 'rgba(200,150,255,0.8)';
