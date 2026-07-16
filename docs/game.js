@@ -651,33 +651,37 @@ class InputManager {
 
     const g = this.game;
     const ui = g.ui;
+    // Snapshot the state for this keypress: the blocks below transition
+    // g.state, and without this a single press could fall through into the
+    // next state's handler (e.g. Escape: EXPLORE -> PAUSE -> instantly back).
+    const s0 = g.state;
 
-    if (g.state === STATE.TITLE) {
+    if (s0 === STATE.TITLE) {
       if (e.code === 'ArrowUp' || e.code === 'KeyW') { ui.titleSelection = Math.max(0, ui.titleSelection - 1); }
       if (e.code === 'ArrowDown' || e.code === 'KeyS') { ui.titleSelection = Math.min(2, ui.titleSelection + 1); }
       if (e.code === 'Enter' || e.code === 'Space') { ui.confirmTitleSelection(); }
     }
 
-    if (g.state === STATE.DIALOGUE || g.state === STATE.CUTSCENE) {
+    if (s0 === STATE.DIALOGUE || s0 === STATE.CUTSCENE) {
       if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyZ') {
         g.dialogue?.advance();
       }
     }
 
-    if (g.state === STATE.EXPLORE) {
+    if (s0 === STATE.EXPLORE) {
       if (e.code === 'Escape') { g.prevState = STATE.EXPLORE; g.state = STATE.PAUSE; }
       if (e.code === 'KeyF' || e.code === 'Enter') { g.explore.interact(); }
       if (e.code === 'KeyJ') { g.state = STATE.JOURNAL; g.audio.playConfirm(); }
     }
 
-    if (g.state === STATE.JOURNAL) {
+    if (s0 === STATE.JOURNAL) {
       if (e.code === 'Escape' || e.code === 'KeyJ' || e.code === 'Enter' || e.code === 'Space') {
         g.state = STATE.EXPLORE;
         g.audio.playCancel();
       }
     }
 
-    if (g.state === STATE.PAUSE) {
+    if (s0 === STATE.PAUSE) {
       const audio = g.audio;
       // Items: 0=Resume, 1=Save, 2=MainMenu; 3=MusicVol, 4=SfxVol
       if (e.code === 'Escape') { g.state = STATE.EXPLORE; }
@@ -702,19 +706,19 @@ class InputManager {
       }
     }
 
-    if (g.state === STATE.BATTLE && g.battle) {
+    if (s0 === STATE.BATTLE && g.battle) {
       g.battle.onKey(e.code);
     }
 
-    if (g.state === STATE.VICTORY) {
+    if (s0 === STATE.VICTORY) {
       if (e.code === 'Enter' || e.code === 'Space') { g.battle?.endVictory(); }
     }
 
-    if (g.state === STATE.DEFEAT) {
+    if (s0 === STATE.DEFEAT) {
       if (e.code === 'Enter' || e.code === 'Space') { g.battle?.endDefeat(); }
     }
 
-    if (g.state === STATE.QUEST_COMPLETE) {
+    if (s0 === STATE.QUEST_COMPLETE) {
       if (e.code === 'Enter' || e.code === 'Space') { g.state = STATE.EXPLORE; }
     }
   }
