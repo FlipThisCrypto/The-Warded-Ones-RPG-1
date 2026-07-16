@@ -2445,8 +2445,8 @@ class BattleManager {
 
   endVictory() {
     this.game.battle = null;
+    this.game.state = STATE.EXPLORE;
     if (this.onWin) this.onWin();
-    else this.game.state = STATE.EXPLORE;
   }
 
   endDefeat() {
@@ -2892,6 +2892,7 @@ function setupClickHandler(game, canvas) {
       // Click on enemies for target
       if (ph === 'PLAYER_TURN' && (game.battle.subMenu === 'target' || game.battle.subMenu === 'ability_target')) {
         const enemies = game.battle.enemies.filter(en => en.currentHp > 0);
+        let acted = false;
         enemies.forEach((en, i) => {
           const ex = W * (0.3 + (i - (enemies.length-1)/2) * 0.25);
           const ey = H * 0.25;
@@ -2900,8 +2901,10 @@ function setupClickHandler(game, canvas) {
             game.battle.selectedTarget = i;
             if (game.battle.subMenu === 'target') game.battle.executePlayerAttack();
             else game.battle.executePlayerAbility();
+            acted = true;
           }
         });
+        if (acted) return; // prevent same click from also dismissing the victory screen
       }
     }
 
