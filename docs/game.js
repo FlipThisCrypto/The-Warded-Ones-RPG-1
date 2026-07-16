@@ -1119,158 +1119,600 @@ class ExploreManager {
   render(ctx, canvas) {
     const W = canvas.width, H = canvas.height;
     this.update(1/60, canvas);
+    const t = this.game.animTimer;
+    const glow = this.game.titleGlow;
 
-    // Background - mystical warded grounds
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-    bgGrad.addColorStop(0, '#060018');
-    bgGrad.addColorStop(0.4, '#0a0328');
-    bgGrad.addColorStop(1, '#040010');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, W, H);
+    // ── Layer 1: Stone floor ────────────────────────────────
+    this._renderFloor(ctx, W, H);
 
-    // Ground tiles
-    ctx.strokeStyle = 'rgba(80,40,120,0.15)';
-    ctx.lineWidth = 1;
-    const tileSize = 64;
-    for (let x = 0; x < W; x += tileSize) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = 0; y < H; y += tileSize) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
+    // ── Layer 2: Great Ward Circle (floor engraving) ────────
+    this._renderWardCircle(ctx, W, H, t, glow);
 
-    // Ward circles (decorative)
-    [
-      { x: W/2, y: H/2, r: 200, alpha: 0.06 },
-      { x: W/2, y: H/2, r: 150, alpha: 0.08 },
-      { x: W/2, y: H/2, r: 100, alpha: 0.10 },
-    ].forEach(c => {
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(150,80,255,${c.alpha + this.game.titleGlow * 0.04})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    });
+    // ── Layer 3: Structures (walls, pillars, platforms) ─────
+    this._renderStructures(ctx, W, H, glow);
 
-    // Draw NPC interaction zones
-    this.encounter_zones.forEach(zone => {
-      if (zone.used) return;
-      ctx.fillStyle = 'rgba(255,80,80,0.05)';
-      ctx.beginPath();
-      ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2);
-      ctx.fill();
-      // Enemy indicator
-      const enemyDef = this.game.data.enemies.find(e => e.id === zone.enemy[0]);
-      if (enemyDef) {
-        const img = this.game.images[`assets/enemies/${zone.enemy[0]}.png`];
-        if (img) {
-          const pulsescale = 0.9 + this.game.titleGlow * 0.1;
-          ctx.save();
-          ctx.globalAlpha = 0.7;
-          ctx.translate(zone.x, zone.y);
-          ctx.scale(pulsescale, pulsescale);
-          ctx.drawImage(img, -35, -35, 70, 70);
-          ctx.restore();
-          ctx.font = '11px Georgia, serif';
-          ctx.fillStyle = 'rgba(255,150,150,0.8)';
-          ctx.textAlign = 'center';
-          ctx.fillText(enemyDef.name, zone.x, zone.y + 50);
-        }
-      }
-    });
+    // ── Layer 4: Encounter zones (cracked floor fissures) ───
+    this._renderEncounterZones(ctx, t, glow);
 
-    // Ward Stone
-    this.objects.forEach(obj => {
-      const pulse = 0.8 + this.game.titleGlow * 0.2;
-      const glowR = obj.radius + 10 * pulse;
-      const glow = ctx.createRadialGradient(obj.x, obj.y, 0, obj.x, obj.y, glowR);
-      glow.addColorStop(0, 'rgba(200,100,255,0.3)');
-      glow.addColorStop(1, 'rgba(200,100,255,0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(obj.x, obj.y, glowR, 0, Math.PI * 2);
-      ctx.fill();
+    // ── Layer 5: Ward Stone pedestal ────────────────────────
+    this._renderWardStone(ctx, t, glow);
 
-      ctx.beginPath();
-      ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(120,40,200,0.6)';
-      ctx.fill();
-      ctx.strokeStyle = `rgba(${this.stoneTouched ? '100,255,100' : '200,100,255'},0.9)`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
+    // ── Layer 6: NPC (Elder Ward) ───────────────────────────
+    this._renderNPCs(ctx, t, glow);
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `${20 + pulse * 4}px serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(obj.icon, obj.x, obj.y + 8);
+    // ── Layer 7: Player ─────────────────────────────────────
+    this.renderPlayer(ctx, t);
 
-      ctx.fillStyle = '#d0a0ff';
-      ctx.font = '12px Georgia, serif';
-      ctx.fillText(obj.label, obj.x, obj.y + obj.radius + 18);
-    });
+    // ── Layer 8: Interaction hints ──────────────────────────
+    this._renderHints(ctx);
 
-    // NPC
-    this.npcs.forEach(npc => {
-      ctx.beginPath();
-      ctx.arc(npc.x, npc.y, npc.radius, 0, Math.PI * 2);
-      ctx.fillStyle = this.elderTalked ? 'rgba(60,100,80,0.7)' : 'rgba(30,60,100,0.7)';
-      ctx.fill();
-      ctx.strokeStyle = npc.color;
-      ctx.lineWidth = 2;
-      ctx.stroke();
+    // ── Layer 9: Atmosphere (vignette + rune particles) ─────
+    this._renderAtmosphere(ctx, W, H, t, glow);
 
-      // Elder Ward rune symbol
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '18px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⬡', npc.x, npc.y + 7);
-
-      ctx.fillStyle = npc.color;
-      ctx.font = '12px Georgia, serif';
-      ctx.fillText(npc.label, npc.x, npc.y + npc.radius + 18);
-
-      // Interaction hint
-      const dist = Math.hypot(this.playerX - npc.x, this.playerY - npc.y);
-      if (dist < npc.radius + 60) {
-        ctx.fillStyle = 'rgba(200,200,255,0.8)';
-        ctx.font = '11px monospace';
-        ctx.fillText('[F] Talk', npc.x, npc.y - npc.radius - 8);
-      }
-    });
-
-    // Interaction hint for stone
-    this.objects.forEach(obj => {
-      const dist = Math.hypot(this.playerX - obj.x, this.playerY - obj.y);
-      if (dist < obj.radius + 60) {
-        ctx.fillStyle = 'rgba(200,200,255,0.8)';
-        ctx.font = '11px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('[F] Examine', obj.x, obj.y - obj.radius - 8);
-      }
-    });
-
-    // Player character
-    this.renderPlayer(ctx);
-
-    // HUD
+    // ── Layer 10: HUD ────────────────────────────────────────
     this.game.ui.renderHUD(ctx, canvas);
-
-    // Party status mini-bars
     this.renderPartyStatus(ctx, canvas);
   }
 
-  renderPlayer(ctx) {
-    const x = this.playerX, y = this.playerY;
-    const portrait = this.game.images['assets/characters/motley_max.png'];
+  // ── Floor ─────────────────────────────────────────────────
+  _renderFloor(ctx, W, H) {
+    // Base fill
+    ctx.fillStyle = '#0d0820';
+    ctx.fillRect(0, 0, W, H);
 
-    if (portrait) {
-      const size = 52;
-      ctx.save();
+    // Stone tiles – consistent variation via hash
+    const TS = 48;
+    const cols = Math.ceil(W / TS) + 1;
+    const rows = Math.ceil(H / TS) + 1;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const hash = (col * 7 + row * 13 + col * row * 3) % 16;
+        const brightness = 14 + hash;
+        const r = brightness, g = Math.floor(brightness * 0.6), b = brightness + 4;
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(col * TS, row * TS, TS - 1, TS - 1);
+
+        // Occasional darker crack line within tile
+        if (hash === 5 || hash === 11) {
+          ctx.strokeStyle = `rgba(0,0,0,0.3)`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(col * TS + 8, row * TS + 12);
+          ctx.lineTo(col * TS + 30, row * TS + 36);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Subtle tile grid lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += TS) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += TS) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+
+  // ── Great Ward Circle ──────────────────────────────────────
+  _renderWardCircle(ctx, W, H, t, glow) {
+    const cx = W / 2, cy = H / 2 + 20;
+    const radii = [220, 170, 130, 90, 55];
+    const alphas = [0.12, 0.15, 0.18, 0.22, 0.28];
+
+    radii.forEach((r, i) => {
+      const pulse = glow * 0.03;
       ctx.beginPath();
-      ctx.arc(x, y, size/2 + 2, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(200,150,255,0.7)';
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(140,70,240,${alphas[i] + pulse})`;
+      ctx.lineWidth = i === 0 ? 3 : 2;
+      ctx.stroke();
+    });
+
+    // Rotating rune spokes
+    const spokeCount = 8;
+    for (let i = 0; i < spokeCount; i++) {
+      const angle = (Math.PI * 2 * i / spokeCount) + t * 0.08;
+      const innerR = 55, outerR = 170;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * innerR, cy + Math.sin(angle) * innerR);
+      ctx.lineTo(cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR);
+      ctx.strokeStyle = `rgba(120,50,220,${0.08 + glow * 0.05})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Counter-rotating inner ring of dots
+    for (let i = 0; i < 12; i++) {
+      const angle = (Math.PI * 2 * i / 12) - t * 0.12;
+      const r2 = 90;
+      const dx = cx + Math.cos(angle) * r2;
+      const dy = cy + Math.sin(angle) * r2;
+      ctx.beginPath();
+      ctx.arc(dx, dy, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(180,100,255,${0.3 + glow * 0.3})`;
+      ctx.fill();
+    }
+
+    // Center glow
+    const cGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 55);
+    cGrad.addColorStop(0, `rgba(100,40,200,${0.12 + glow * 0.08})`);
+    cGrad.addColorStop(1, 'rgba(100,40,200,0)');
+    ctx.fillStyle = cGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 55, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Structures ─────────────────────────────────────────────
+  _renderStructures(ctx, W, H, glow) {
+    // Top border wall
+    const wallH = 55;
+    ctx.fillStyle = '#090614';
+    ctx.fillRect(0, 0, W, wallH);
+    // Wall top edge highlight
+    ctx.fillStyle = 'rgba(100,60,160,0.4)';
+    ctx.fillRect(0, wallH - 3, W, 3);
+    // Wall pattern – vertical stones
+    for (let x = 0; x < W; x += 60) {
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.fillRect(x, 0, 2, wallH);
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      ctx.fillRect(x + 2, 0, 28, wallH);
+    }
+    // Title banner text
+    ctx.fillStyle = `rgba(160,90,255,${0.4 + glow * 0.3})`;
+    ctx.font = `bold 13px 'Cinzel', Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('⬡  THE WARDED GROUNDS  ⬡', W / 2, 34);
+
+    // Side walls (thin strips)
+    ctx.fillStyle = '#07050f';
+    ctx.fillRect(0, wallH, 18, H - wallH);
+    ctx.fillRect(W - 18, wallH, 18, H - wallH);
+    ctx.fillStyle = 'rgba(100,60,160,0.3)';
+    ctx.fillRect(16, wallH, 2, H - wallH);
+    ctx.fillRect(W - 18, wallH, 2, H - wallH);
+
+    // Bottom border
+    ctx.fillStyle = '#07050f';
+    ctx.fillRect(0, H - 18, W, 18);
+    ctx.fillStyle = 'rgba(80,40,120,0.4)';
+    ctx.fillRect(0, H - 20, W, 2);
+
+    // Corner pillars
+    [
+      [18, wallH], [W - 54, wallH],
+      [18, H - 70], [W - 54, H - 70],
+    ].forEach(([px, py]) => this._drawPillar(ctx, px, py, 36, 60, glow));
+
+    // Additional mid pillars
+    [
+      [18, H / 2 - 30], [W - 54, H / 2 - 30],
+    ].forEach(([px, py]) => this._drawPillar(ctx, px, py, 28, 50, glow));
+
+    // Elder Ward platform (top-left raised area)
+    this._drawPlatform(ctx, 60, wallH + 8, 180, 100, glow);
+
+    // Ward Stone pedestal (top-right)
+    this._drawPedestal(ctx, 680, wallH + 10, 80, 85, glow);
+  }
+
+  _drawPillar(ctx, x, y, w, h, glow) {
+    // Pillar body
+    const grad = ctx.createLinearGradient(x, y, x + w, y);
+    grad.addColorStop(0, '#1a0e2a');
+    grad.addColorStop(0.3, '#2a1840');
+    grad.addColorStop(1, '#0d0818');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+    // Cap
+    ctx.fillStyle = '#3a2060';
+    ctx.fillRect(x - 4, y, w + 8, 10);
+    ctx.fillRect(x - 4, y + h - 6, w + 8, 6);
+    // Glow edge
+    ctx.strokeStyle = `rgba(120,60,200,${0.2 + glow * 0.15})`;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  _drawPlatform(ctx, x, y, w, h, glow) {
+    // Raised stone platform for Elder Ward
+    ctx.fillStyle = '#100820';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#1e1030';
+    ctx.fillRect(x + 4, y + 4, w - 8, h - 8);
+    // Border glow
+    ctx.strokeStyle = `rgba(80,160,255,${0.25 + glow * 0.15})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    // Step at bottom
+    ctx.fillStyle = '#180c28';
+    ctx.fillRect(x - 6, y + h, w + 12, 8);
+    ctx.fillStyle = 'rgba(80,160,255,0.15)';
+    ctx.fillRect(x - 6, y + h, w + 12, 2);
+    // Label
+    ctx.fillStyle = 'rgba(80,160,255,0.5)';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('ELDER\'S ALCOVE', x + w / 2, y + h - 8);
+  }
+
+  _drawPedestal(ctx, x, y, w, h, glow) {
+    // Stone pedestal for the Ward Stone
+    // Base slab
+    ctx.fillStyle = '#160e28';
+    ctx.fillRect(x - 8, y + h - 12, w + 16, 12);
+    // Body
+    const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+    grad.addColorStop(0, '#1e1238');
+    grad.addColorStop(1, '#0e0820');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h - 12);
+    // Top face (slightly lighter)
+    ctx.fillStyle = '#2a1848';
+    ctx.fillRect(x, y, w, 14);
+    // Glow border
+    ctx.strokeStyle = `rgba(180,80,255,${0.3 + glow * 0.2})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    // Rune carved on front
+    ctx.fillStyle = `rgba(180,80,255,${0.3 + glow * 0.25})`;
+    ctx.font = '20px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⬡', x + w / 2, y + h / 2 + 6);
+    // Label
+    ctx.fillStyle = 'rgba(180,80,255,0.5)';
+    ctx.font = '9px monospace';
+    ctx.fillText('PEDESTAL', x + w / 2, y + h - 2);
+  }
+
+  // ── Encounter Zones ────────────────────────────────────────
+  _renderEncounterZones(ctx, t, glow) {
+    this.encounter_zones.forEach(zone => {
+      if (zone.used) return;
+
+      const pulse = 0.5 + Math.sin(t * 2.5) * 0.3;
+      const enemyDef = this.game.data.enemies.find(e => e.id === zone.enemy[0]);
+
+      // Cracked floor fissure — radiating lines from center
+      ctx.save();
+      ctx.translate(zone.x, zone.y);
+      const crackCount = 7;
+      for (let i = 0; i < crackCount; i++) {
+        const angle = (Math.PI * 2 * i / crackCount) + i * 0.3;
+        const len = zone.r * 0.7 + (i % 3) * 10;
+        ctx.strokeStyle = `rgba(220,60,60,${0.25 + pulse * 0.2})`;
+        ctx.lineWidth = 1 + (i % 2);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        // Jagged crack line
+        const mx = Math.cos(angle + 0.2) * len * 0.5;
+        const my = Math.sin(angle + 0.2) * len * 0.5;
+        ctx.quadraticCurveTo(mx, my, Math.cos(angle) * len, Math.sin(angle) * len);
+        ctx.stroke();
+      }
+      // Glowing center pit
+      const pitGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
+      pitGrad.addColorStop(0, `rgba(220,50,50,${0.35 + pulse * 0.25})`);
+      pitGrad.addColorStop(0.6, `rgba(120,20,20,${0.12 + pulse * 0.1})`);
+      pitGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pitGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 30, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Enemy portrait (small, above zone)
+      if (enemyDef) {
+        const img = this.game.images[`assets/enemies/${zone.enemy[0]}.png`];
+        if (img) {
+          const s = 54;
+          const bob = Math.sin(t * 2) * 3;
+          ctx.save();
+          ctx.globalAlpha = 0.85;
+          ctx.shadowColor = 'rgba(220,60,60,0.6)';
+          ctx.shadowBlur = 12;
+          ctx.drawImage(img, zone.x - s/2, zone.y - s - 8 + bob, s, s);
+          ctx.restore();
+          // Name tag
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(zone.x - 48, zone.y + 6, 96, 16);
+          ctx.fillStyle = `rgba(255,120,120,${0.7 + glow * 0.3})`;
+          ctx.font = 'bold 10px Georgia, serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(enemyDef.name, zone.x, zone.y + 17);
+        }
+      }
+    });
+  }
+
+  // ── Ward Stone ─────────────────────────────────────────────
+  _renderWardStone(ctx, t, glow) {
+    this.objects.forEach(obj => {
+      const pulse = 0.6 + Math.sin(t * 1.8) * 0.4;
+      const done = this.stoneTouched;
+      const stoneColor = done ? [80, 255, 120] : [180, 80, 255];
+      const [sr, sg, sb] = stoneColor;
+
+      // Outer glow halo
+      const haloGrad = ctx.createRadialGradient(obj.x, obj.y - 20, 0, obj.x, obj.y - 20, 70);
+      haloGrad.addColorStop(0, `rgba(${sr},${sg},${sb},${0.2 + pulse * 0.15})`);
+      haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = haloGrad;
+      ctx.beginPath();
+      ctx.arc(obj.x, obj.y - 20, 70, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rising energy beams
+      if (!done) {
+        for (let i = 0; i < 4; i++) {
+          const bx = obj.x + (i - 1.5) * 14;
+          const beamAlpha = (0.3 + Math.sin(t * 3 + i) * 0.2) * pulse;
+          const beamGrad = ctx.createLinearGradient(bx, obj.y - 60, bx, obj.y);
+          beamGrad.addColorStop(0, `rgba(${sr},${sg},${sb},0)`);
+          beamGrad.addColorStop(1, `rgba(${sr},${sg},${sb},${beamAlpha})`);
+          ctx.fillStyle = beamGrad;
+          ctx.fillRect(bx - 2, obj.y - 60, 4, 60);
+        }
+      }
+
+      // Crystal gem body — diamond shape
+      const cx = obj.x, cy = obj.y - 28;
+      const cw = 22, ch = 30;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.sin(t * 0.5) * 0.08);
+
+      ctx.beginPath();
+      ctx.moveTo(0, -ch);          // top
+      ctx.lineTo(cw, 0);           // right
+      ctx.lineTo(0, ch * 0.6);     // bottom
+      ctx.lineTo(-cw, 0);          // left
+      ctx.closePath();
+      const crystalGrad = ctx.createLinearGradient(-cw, -ch, cw, ch * 0.6);
+      crystalGrad.addColorStop(0, `rgba(${sr},${sg},${sb},0.9)`);
+      crystalGrad.addColorStop(0.5, `rgba(${Math.floor(sr*0.6)},${Math.floor(sg*0.6)},${Math.floor(sb*0.6)},0.7)`);
+      crystalGrad.addColorStop(1, `rgba(${sr},${sg},${sb},0.5)`);
+      ctx.fillStyle = crystalGrad;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${sr},${sg},${sb},${0.7 + pulse * 0.3})`;
       ctx.lineWidth = 2;
       ctx.stroke();
+
+      // Inner facet highlight
+      ctx.beginPath();
+      ctx.moveTo(0, -ch);
+      ctx.lineTo(cw * 0.4, -ch * 0.1);
+      ctx.lineTo(0, ch * 0.6);
+      ctx.strokeStyle = `rgba(255,255,255,0.25)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      // Object label
+      ctx.fillStyle = `rgba(${sr},${sg},${sb},0.8)`;
+      ctx.font = 'bold 11px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(done ? '✦ CLAIMED ✦' : obj.label, obj.x, obj.y + obj.radius - 2);
+    });
+  }
+
+  // ── NPC (Elder Ward) ───────────────────────────────────────
+  _renderNPCs(ctx, t, glow) {
+    this.npcs.forEach(npc => {
+      const bob = Math.sin(t * 1.4) * 2;
+      const auraAlpha = 0.15 + glow * 0.12;
+
+      // Aura glow beneath
+      const aura = ctx.createRadialGradient(npc.x, npc.y + bob, 0, npc.x, npc.y + bob, 38);
+      aura.addColorStop(0, `rgba(80,160,255,${auraAlpha * 2})`);
+      aura.addColorStop(1, 'rgba(80,160,255,0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath();
+      ctx.arc(npc.x, npc.y + bob, 38, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(npc.x, npc.y + bob);
+
+      // Shadow on floor
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(0, 16, 14, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Robe body
+      ctx.fillStyle = this.elderTalked ? '#1a3040' : '#102040';
+      ctx.beginPath();
+      ctx.moveTo(-12, 0);
+      ctx.lineTo(-15, 24);
+      ctx.lineTo(15, 24);
+      ctx.lineTo(12, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(80,160,255,0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Robe details — hem runes
+      ctx.strokeStyle = `rgba(80,160,255,${0.25 + glow * 0.2})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-12, 16); ctx.lineTo(12, 16);
+      ctx.stroke();
+
+      // Arms
+      ctx.strokeStyle = '#102040';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-12, 4);
+      ctx.lineTo(-18, 14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(12, 4);
+      ctx.lineTo(18, 14);
+      ctx.stroke();
+
+      // Staff (left hand)
+      ctx.strokeStyle = '#8060a0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-18, 14);
+      ctx.lineTo(-22, -18);
+      ctx.stroke();
+      // Staff orb
+      const orbGlow = 0.5 + Math.sin(t * 2.5) * 0.3;
+      ctx.fillStyle = `rgba(80,160,255,${orbGlow})`;
+      ctx.beginPath();
+      ctx.arc(-22, -20, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(140,200,255,0.8)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Head (hood)
+      ctx.fillStyle = '#0e1830';
+      ctx.beginPath();
+      ctx.ellipse(0, -8, 10, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(80,160,255,0.35)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Hood tip
+      ctx.fillStyle = '#0e1830';
+      ctx.beginPath();
+      ctx.moveTo(-6, -16);
+      ctx.quadraticCurveTo(0, -28, 6, -16);
+      ctx.fill();
+      // Face glow
+      ctx.fillStyle = `rgba(100,180,255,${0.2 + glow * 0.1})`;
+      ctx.beginPath();
+      ctx.ellipse(0, -8, 5, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Eyes
+      ctx.fillStyle = `rgba(140,220,255,${0.8 + glow * 0.2})`;
+      ctx.beginPath();
+      ctx.ellipse(-3, -9, 2, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(3, -9, 2, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // Name tag
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(npc.x - 40, npc.y + bob + 30, 80, 16);
+      ctx.fillStyle = npc.color;
+      ctx.font = 'bold 10px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(npc.label, npc.x, npc.y + bob + 42);
+    });
+  }
+
+  // ── Interaction Hints ──────────────────────────────────────
+  _renderHints(ctx) {
+    const showHint = (x, y, text) => {
+      const w = ctx.measureText(text).width + 16;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(x - w/2, y - 15, w, 18);
+      ctx.strokeStyle = 'rgba(200,180,255,0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - w/2, y - 15, w, 18);
+      ctx.fillStyle = '#d0c0ff';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, x, y - 1);
+    };
+
+    this.npcs.forEach(npc => {
+      const dist = Math.hypot(this.playerX - npc.x, this.playerY - npc.y);
+      if (dist < npc.radius + 60) showHint(npc.x, npc.y - 42, '[F] Talk');
+    });
+
+    this.objects.forEach(obj => {
+      const dist = Math.hypot(this.playerX - obj.x, this.playerY - obj.y);
+      if (dist < obj.radius + 60) showHint(obj.x, obj.y - obj.radius - 20, '[F] Examine');
+    });
+  }
+
+  // ── Atmosphere ─────────────────────────────────────────────
+  _renderAtmosphere(ctx, W, H, t, glow) {
+    // Edge vignette
+    const vig = ctx.createRadialGradient(W/2, H/2, W * 0.25, W/2, H/2, W * 0.75);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,8,0.55)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+
+    // Floating rune particles around ward circle
+    const cx = W/2, cy = H/2 + 20;
+    const glyphs = ['⬡', '✦', '◈', '⊕', '⟐'];
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 * i / 8) + t * 0.05;
+      const r = 195 + Math.sin(t * 0.8 + i) * 12;
+      const px = cx + Math.cos(angle) * r;
+      const py = cy + Math.sin(angle) * r;
+      const alpha = 0.12 + Math.sin(t * 1.5 + i * 0.8) * 0.08;
+      ctx.fillStyle = `rgba(160,80,255,${alpha})`;
+      ctx.font = '11px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(glyphs[i % glyphs.length], px, py);
+    }
+
+    // Mist wisps at floor level (bottom quarter)
+    for (let i = 0; i < 5; i++) {
+      const mx = (i / 4) * W;
+      const my = H - 40 + Math.sin(t * 0.6 + i) * 10;
+      const mistGrad = ctx.createRadialGradient(mx, my, 0, mx, my, 80);
+      mistGrad.addColorStop(0, `rgba(40,20,70,${0.04 + glow * 0.02})`);
+      mistGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = mistGrad;
+      ctx.beginPath();
+      ctx.ellipse(mx, my, 80, 25, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  renderPlayer(ctx, t = 0) {
+    const x = this.playerX;
+    const isMoving = this.game.input.isDown('ArrowLeft') || this.game.input.isDown('ArrowRight') ||
+                     this.game.input.isDown('ArrowUp') || this.game.input.isDown('ArrowDown') ||
+                     this.game.input.isDown('KeyA') || this.game.input.isDown('KeyD') ||
+                     this.game.input.isDown('KeyW') || this.game.input.isDown('KeyS');
+    const bob = isMoving ? Math.sin(t * 12) * 3 : 0;
+    const y = this.playerY + bob;
+    const portrait = this.game.images['assets/characters/motley_max.png'];
+    const size = 48;
+
+    // Floor shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(x, this.playerY + size * 0.4, size * 0.4, size * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Player glow
+    const pGlow = ctx.createRadialGradient(x, y, 0, x, y, size);
+    pGlow.addColorStop(0, 'rgba(160,80,255,0.15)');
+    pGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = pGlow;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (portrait) {
+      ctx.save();
+      // Pulsing ring
+      const ringAlpha = 0.5 + Math.sin(t * 3) * 0.25;
+      ctx.beginPath();
+      ctx.arc(x, y, size/2 + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(200,140,255,${ringAlpha})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Portrait clipped to circle
       ctx.beginPath();
       ctx.arc(x, y, size/2, 0, Math.PI * 2);
       ctx.clip();
@@ -1279,14 +1721,17 @@ class ExploreManager {
     } else {
       ctx.fillStyle = '#8040ff';
       ctx.beginPath();
-      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.arc(x, y, size/2, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '10px Georgia, serif';
+    // Name tag
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x - 38, y + size/2 + 4, 76, 15);
+    ctx.fillStyle = '#e0c0ff';
+    ctx.font = 'bold 10px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Motley Max', x, y + 36);
+    ctx.fillText('Motley Max', x, y + size/2 + 14);
   }
 
   renderPartyStatus(ctx, canvas) {
