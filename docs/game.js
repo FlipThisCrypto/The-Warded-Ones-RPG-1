@@ -370,6 +370,11 @@ class WardedOnesGame {
     ctx.font = `${Math.floor(W * 0.014)}px 'Georgia', serif`;
     ctx.fillStyle = `rgba(180, 140, 220, ${0.5 + this.titleGlow * 0.5})`;
     ctx.fillText('W/S or ARROWS: Navigate   |   ENTER / CLICK: Select', W / 2, H * 0.88);
+
+    // Prologue replay hint
+    ctx.font = `${Math.floor(W * 0.011)}px monospace`;
+    ctx.fillStyle = 'rgba(150, 110, 200, 0.55)';
+    ctx.fillText('P — replay the prologue flight', W / 2, H * 0.92);
   }
 
   // ─── Particle System ──────────────────────────────────────
@@ -435,6 +440,32 @@ class WardedOnesGame {
       this.state = STATE.CUTSCENE;
     });
     this.state = STATE.PROLOGUE;
+  }
+
+  // Re-watch the opening flight from the title screen (P). Renders the world
+  // as it currently stands — a fresh map at boot, your map after a Continue.
+  startPrologueReplay() {
+    this.prologue = new ScrollFlightManager(this, () => {
+      this.prologue = null;
+      this.state = STATE.TITLE;
+    });
+    this.state = STATE.PROLOGUE;
+  }
+
+  // Finale victory lap: same flight engine, past-tense copy, restored world.
+  startEpilogue() {
+    this.prologue = new ScrollFlightManager(this, () => {
+      this.prologue = null;
+      this.state = STATE.EXPLORE;
+    }, ScrollFlightManager.EPILOGUE);
+    this.state = STATE.PROLOGUE;
+  }
+
+  dismissQuestComplete() {
+    const done = this.ui.questCompleteData?.quest;
+    this.state = STATE.EXPLORE;
+    // The Astral Hunt is the finale — send the player on the epilogue flight
+    if (done && done.id === 'the_astral_hunt') this.startEpilogue();
   }
 
   createPartyMember(charDef) {
@@ -710,6 +741,7 @@ class InputManager {
       if (e.code === 'ArrowUp' || e.code === 'KeyW') { ui.titleSelection = Math.max(0, ui.titleSelection - 1); }
       if (e.code === 'ArrowDown' || e.code === 'KeyS') { ui.titleSelection = Math.min(2, ui.titleSelection + 1); }
       if (e.code === 'Enter' || e.code === 'Space') { ui.confirmTitleSelection(); }
+      if (e.code === 'KeyP' && !e.repeat) { g.startPrologueReplay(); g.audio.playConfirm(); }
     }
 
     if (s0 === STATE.DIALOGUE || s0 === STATE.CUTSCENE) {
@@ -782,7 +814,7 @@ class InputManager {
     }
 
     if (s0 === STATE.QUEST_COMPLETE) {
-      if (e.code === 'Enter' || e.code === 'Space') { g.state = STATE.EXPLORE; }
+      if (e.code === 'Enter' || e.code === 'Space') { g.dismissQuestComplete(); }
     }
   }
 
@@ -1436,25 +1468,27 @@ class DialogueManager {
   }
 }
 
-// ─── Explore Manager ─────────────────────────────────────────
-// ─── Scroll-Flight Prologue ──────────────────────────────────
-// A scroll-scrubbed camera flight over the Warded Grounds, played when a new
-// game begins: scrolling (mouse wheel / touch drag / W-S keys) drives a
-// continuous camera along a keyframed flight path through five story-beat
-// sections, each with pinned copy, a route rail, and a progress bar.
+// ─── Scroll-Flight Cinematics ────────────────────────────────
+// A scroll-scrubbed camera flight over the live-rendered Warded Grounds:
+// scrolling (mouse wheel / touch drag / W-S keys) drives a continuous camera
+// along a keyframed flight path through story-beat sections, each with pinned
+// copy, a route rail, and a progress bar. Used for the new-game prologue
+// (default config), the finale epilogue (EPILOGUE config), and the title-
+// screen prologue replay.
 // Section keyframes are shared between neighbours so every seam is
 // position-continuous, and per-section easing zeroes camera velocity at the
 // seams (no rewind stutter when the flight changes direction).
 // Scrub pacing math — smoothstep, the lingerEase monotone time-remap, the
-// 0.18 chase lerp, and the per-section copy opacity curves — adapted from
-// the scroll-world scrub engine: https://github.com/oso95/scroll-world (MIT).
+// 0.18 chase lerp, the per-section copy opacity curves, and the
+// prefers-reduced-motion fallback — adapted from the scroll-world scrub
+// engine: https://github.com/oso95/scroll-world (MIT).
 class ScrollFlightManager {
-  constructor(game, onComplete) {
+  constructor(game, onComplete, opts = {}) {
     this.game = game;
     this.onComplete = onComplete;
 
     // Camera keyframes in map coordinates; section i flies K[i] → K[i+1].
-    this.keyframes = [
+    this.keyframes = opts.keyframes || [
       { x: 450, y: 300, z: 0.84 },  // high overview of the grounds
       { x: 450, y: 330, z: 1.35 },  // the great ward circle
       { x: 430, y: 428, z: 1.50 },  // southern fissures — the guardian dens
@@ -1462,7 +1496,8 @@ class ScrollFlightManager {
       { x: 148, y: 172, z: 1.55 },  // the Elder's alcove
       { x: 148, y: 176, z: 1.85 },  // slow push-in on the Elder
     ];
-    this.sections = [
+    // Copy the section objects — configs are shared, but start/end are ours.
+    this.sections = (opts.sections || [
       { label: 'The Grounds',   eyebrow: 'THE WARDED ONES',  title: 'The Warded Grounds',
         body: 'For an age the wards have held — quiet stone and patient starlight. Tonight, they tremble.',
         accent: '#a06cff', w: 1.0,  linger: 0 },
@@ -1478,7 +1513,8 @@ class ScrollFlightManager {
       { label: 'The Elder',     eyebrow: 'YOUR TRIAL BEGINS', title: 'The Elder awaits a Jester.',
         body: 'Chaos answers chaos. A trickster\'s wit may mend what solemn magic cannot.',
         accent: '#c9a0ff', w: 1.3,  linger: 0.5 },
-    ];
+    ]).map(s => ({ ...s }));
+    this.endCta = opts.endCta || 'BEGIN THE TRIAL';
     let off = 0;
     this.sections.forEach(s => { s.start = off; off += s.w; s.end = off; });
     this.totalW = off;
@@ -1496,6 +1532,38 @@ class ScrollFlightManager {
     // Coarse-pointer check (not maxTouchPoints): a touchscreen laptop driven
     // by mouse+keyboard should still see the wheel/ESC affordances.
     this.isTouch = !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+    // prefers-reduced-motion: the camera snaps between poses instead of
+    // gliding (scroll-world's reduce path: chase factor 1, no drift).
+    this.reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  // Finale config: a victory lap over the restored grounds — the live render
+  // already shows the claimed Ward Stone, calm Star Sigil, and opened caches.
+  static get EPILOGUE() {
+    return {
+      endCta: 'RETURN TO THE GROUNDS',
+      keyframes: [
+        { x: 450, y: 300, z: 0.84 },  // high overview
+        { x: 450, y: 330, z: 1.35 },  // the ward circle, burning whole
+        { x: 430, y: 428, z: 1.50 },  // the quiet fissures
+        { x: 455, y: 100, z: 1.55 },  // the becalmed Star Sigil
+        { x: 148, y: 174, z: 1.70 },  // the Elder and the company
+      ],
+      sections: [
+        { label: 'The Wards',     eyebrow: 'THE TRIAL IS OVER',   title: 'The wards hold.',
+          body: 'The circle burns whole again — five rings, unbroken, singing beneath the stone.',
+          accent: '#ffd166', w: 1.0, linger: 0.35 },
+        { label: 'The Guardians', eyebrow: 'PEACE IN THE GROUNDS', title: 'The guardians rest.',
+          body: 'The fissures lie quiet. The great cats keep their watch once more — protectors, not prey.',
+          accent: '#7fd4ff', w: 1.1, linger: 0.45 },
+        { label: 'The Sigil',     eyebrow: 'THE HUNT IS ENDED',   title: 'The stars stand down.',
+          body: 'What walked out of the constellations walks there no longer. The sigil glows soft and calm.',
+          accent: '#8ef0c0', w: 1.1, linger: 0.45 },
+        { label: 'The Company',   eyebrow: 'WARD-KEEPERS ALL',    title: 'Six Jesters, one legend.',
+          body: 'Where one answered the call, a full company now stands. The Elder bows to you.',
+          accent: '#c9a0ff', w: 1.3, linger: 0.5 },
+      ],
+    };
   }
 
   // ── pacing math ported from scroll-world (MIT) ──
@@ -1559,8 +1627,9 @@ class ScrollFlightManager {
               - ((input.isDown('KeyW') || input.isDown('ArrowUp')) ? 1 : 0);
     if (dir) this.scrollTarget = ScrollFlightManager.clamp(this.scrollTarget + dir * dt * 1.1, 0, this.totalW);
 
-    // Chase the target (scroll-world's per-frame 0.18 lerp, dt-normalized)
-    this.scrollCur += (this.scrollTarget - this.scrollCur) * Math.min(1, dt * 60 * 0.18);
+    // Chase the target (scroll-world's per-frame 0.18 lerp, dt-normalized;
+    // under prefers-reduced-motion the chase is instant — no drifting camera)
+    this.scrollCur += (this.scrollTarget - this.scrollCur) * (this.reduce ? 1 : Math.min(1, dt * 60 * 0.18));
 
     if (this.fadeIn > 0) this.fadeIn = Math.max(0, this.fadeIn - dt * 1.2);
     if (this.finishing) {
@@ -1668,7 +1737,7 @@ class ScrollFlightManager {
       ctx.fillRect(0, 46, 600, H - 92);
 
       const cx2 = 56;
-      const cy2 = H * 0.5 + (0.5 - pr) * 26;
+      const cy2 = H * 0.5 + (this.reduce ? 0 : (0.5 - pr) * 26);
       ctx.textAlign = 'left';
       ctx.globalAlpha = cop;
       ctx.fillStyle = 'rgba(170,140,210,0.85)';
@@ -1717,7 +1786,9 @@ class ScrollFlightManager {
         ctx.textAlign = 'right';
         ctx.fillText(s.label, railX - 16, dy + 3);
       }
-      this.dotRects.push({ x: railX - 14, y: dy - 14, w: 28, h: 28 });
+      // Finger-sized hit areas on touch (the visible dot stays small)
+      const hp = this.isTouch ? 22 : 14;
+      this.dotRects.push({ x: railX - hp, y: dy - hp, w: hp * 2, h: hp * 2 });
     });
 
     // ── Progress bar (top edge) ──
@@ -1734,7 +1805,7 @@ class ScrollFlightManager {
       ctx.fillStyle = 'rgba(200,170,255,0.85)';
       ctx.font = '11px monospace';
       ctx.fillText(this.isTouch ? 'DRAG TO FLY' : 'SCROLL TO FLY IN', W / 2, H - 60);
-      if (!this.isTouch) {
+      if (!this.isTouch && !this.reduce) {
         // little mouse-wheel glyph with a travelling dot
         const mx = W / 2, my = H - 96;
         ctx.strokeStyle = 'rgba(200,170,255,0.6)';
@@ -1758,16 +1829,17 @@ class ScrollFlightManager {
       ctx.textAlign = 'center';
       ctx.fillStyle = `rgba(240,208,128,${pulse})`;
       ctx.font = 'bold 16px Cinzel, serif';
-      ctx.fillText(this.isTouch ? '✦  TAP TO BEGIN THE TRIAL  ✦' : '✦  ENTER — BEGIN THE TRIAL  ✦', W / 2, H - 62);
+      ctx.fillText(this.isTouch ? `✦  TAP — ${this.endCta}  ✦` : `✦  ENTER — ${this.endCta}  ✦`, W / 2, H - 62);
     }
 
     // ── Skip button (bottom right) ──
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(150,110,200,0.55)';
     ctx.font = '10px monospace';
-    const skipLabel = this.isTouch ? '✕ SKIP' : 'ESC — SKIP PROLOGUE';
+    const skipLabel = this.isTouch ? '✕ SKIP' : 'ESC — SKIP';
     ctx.fillText(skipLabel, W - 16, H - 18);
-    this.skipRect = { x: W - 176, y: H - 40, w: 168, h: 32 };
+    this.skipRect = this.isTouch ? { x: W - 216, y: H - 46, w: 208, h: 44 }
+                                 : { x: W - 176, y: H - 40, w: 168, h: 32 };
 
     // ── Fades ──
     if (this.fadeIn > 0) {
@@ -1781,6 +1853,7 @@ class ScrollFlightManager {
   }
 }
 
+// ─── Explore Manager ─────────────────────────────────────────
 class ExploreManager {
   constructor(game) {
     this.game = game;
@@ -4400,12 +4473,19 @@ function setupClickHandler(game, canvas) {
 
     if (game.state === STATE.TITLE) {
       const menuY = [H * 0.48, H * 0.56, H * 0.64];
+      let hitMenu = false;
       menuY.forEach((my, i) => {
         if (Math.abs(cy - my) < 20) {
           game.ui.titleSelection = i;
           game.ui.confirmTitleSelection();
+          hitMenu = true;
         }
       });
+      // "Replay the Prologue" hint line
+      if (!hitMenu && Math.abs(cy - H * 0.92) < 12) {
+        game.startPrologueReplay();
+        game.audio.playConfirm();
+      }
     }
 
     if (game.state === STATE.DIALOGUE || game.state === STATE.CUTSCENE) {
@@ -4459,7 +4539,7 @@ function setupClickHandler(game, canvas) {
       game.battle.endDefeat();
     }
     if (game.state === STATE.QUEST_COMPLETE) {
-      game.state = STATE.EXPLORE;
+      game.dismissQuestComplete();
     }
 
     if (game.state === STATE.EXPLORE) {
