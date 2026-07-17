@@ -3149,10 +3149,13 @@ class BattleManager {
   }
 
   buildTurnOrder() {
-    const combatants = [
-      ...this.party.map(m => ({ ...m, isPlayer: true })),
-      ...this.enemies.map(e => ({ ...e, isPlayer: false })),
-    ];
+    // Hold LIVE references, not copies. The turn order must see the same
+    // objects the rest of combat mutates — otherwise start-of-turn upkeep
+    // (clearing Defend, ticking DoT/expiry) and the dead-unit skip run
+    // against a frozen snapshot and never take effect.
+    this.party.forEach(m => { m.isPlayer = true; });
+    this.enemies.forEach(e => { e.isPlayer = false; });
+    const combatants = [...this.party, ...this.enemies];
     combatants.sort((a, b) => b.stats.spd - a.stats.spd);
     this.turnOrder = combatants;
     this.currentTurn = 0;
@@ -3160,7 +3163,7 @@ class BattleManager {
   }
 
   advanceToNextTurn() {
-    // Skip dead combatants
+    // Skip dead combatants (reads LIVE hp now, so KO'd units never act)
     let loops = 0;
     while (loops < 20) {
       const c = this.turnOrder[this.currentTurn % this.turnOrder.length];
@@ -3169,6 +3172,31 @@ class BattleManager {
       loops++;
     }
     const c = this.turnOrder[this.currentTurn % this.turnOrder.length];
+
+    // Start-of-turn upkeep, on the LIVE combatant and for BOTH sides:
+    // clear last turn's guard, then tick DoT + status expiry.
+    c.defending = false;
+    const wasFrozen = c.statusEffects?.some(se => se.type === 'freeze');
+    this.applyStatusEffects(c);
+
+    // A burn/poison tick can be lethal — resolve the death before granting a turn.
+    if (c.currentHp <= 0) {
+      if (this.checkBattleEnd()) return;
+      this.currentTurn++;
+      this.advanceToNextTurn();
+      return;
+    }
+
+    // Freeze (now expired by the tick above) costs the frozen unit its turn.
+    if (wasFrozen) {
+      this.addLog(`${c.name} is frozen solid and can't move!`);
+      const pos = this._combatantPos(c);
+      this.spawnFloat(pos.x, pos.y - 30, 'FROZEN', '#7fdfff');
+      this.currentTurn++;
+      setTimeout(() => this.advanceToNextTurn(), 500);
+      return;
+    }
+
     if (c.isPlayer) {
       // Find which party member
       this.selectedMember = this.party.findIndex(m => m.id === c.id && m.currentHp > 0);
@@ -3176,25 +3204,36 @@ class BattleManager {
       this.phase = 'PLAYER_TURN';
       this.selectedAction = 0;
       this.subMenu = null;
-      c.defending = false;
-      this.applyStatusEffects(c);
     } else {
       this.phase = 'ENEMY_TURN';
       this.scheduleEnemyAction(c);
     }
   }
 
+  // Screen position of a combatant, from the per-frame position caches.
+  _combatantPos(c) {
+    const id = c.id || c.name;
+    return this.enemyPositions.find(p => p.id === id)
+        || this.partyPositions.find(p => p.id === id)
+        || { x: 450, y: 220 };
+  }
+
   applyStatusEffects(combatant) {
     if (!combatant.statusEffects) return;
+    const pos = this._combatantPos(combatant);
     combatant.statusEffects = combatant.statusEffects.filter(se => {
       if (se.type === 'burn') {
         const dmg = 8;
         combatant.currentHp = Math.max(0, combatant.currentHp - dmg);
         this.addLog(`${combatant.name} takes ${dmg} burn damage!`);
+        this.spawnFloat(pos.x, pos.y - 20, dmg, '#ff7a30');
+        this.spawnHitFlash(combatant.id || combatant.name, '#ff5500');
       } else if (se.type === 'poison') {
         const dmg = 5;
         combatant.currentHp = Math.max(0, combatant.currentHp - dmg);
         this.addLog(`${combatant.name} takes ${dmg} poison damage!`);
+        this.spawnFloat(pos.x, pos.y - 20, dmg, '#a0e030');
+        this.spawnHitFlash(combatant.id || combatant.name, '#80c000');
       }
       se.duration--;
       return se.duration > 0;
@@ -3211,6 +3250,15 @@ class BattleManager {
   executeEnemyAction(enemy) {
     const alive = this.party.filter(m => m.currentHp > 0);
     if (!alive.length) { this.checkBattleEnd(); return; }
+
+    // Confusion (Shuffle): the enemy may flail and strike itself instead.
+    if (enemy.statusEffects?.some(se => se.type === 'confuse') && Math.random() < 0.4) {
+      this.addLog(`${enemy.name} is confused and strikes itself!`);
+      this.executeAbility(enemy, [enemy], 'claw_swipe', false);
+      this.checkBattleEnd();
+      setTimeout(() => { this.currentTurn++; this.advanceToNextTurn(); }, 600);
+      return;
+    }
 
     const ability = this.chooseEnemyAbility(enemy);
     // AoE abilities (target: all_enemies) hit the whole living party;
@@ -3410,7 +3458,10 @@ class BattleManager {
   }
 
   calcDamage(actor, target, abilityDef) {
-    const atk = actor.stats?.atk || 15;
+    let atk = actor.stats?.atk || 15;
+    // atk_down debuff: applied as a damage-time multiplier so we never mutate
+    // the shared stats object (enemy stats are spread by reference from JSON).
+    if (actor.statusEffects?.some(se => se.type === 'atk_down')) atk = Math.floor(atk * 0.7);
     const def = target.stats?.def || 10;
     const ignoreDef = abilityDef.ignore_def || 0;
     const effectiveDef = Math.floor(def * (1 - ignoreDef));
