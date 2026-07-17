@@ -2112,6 +2112,20 @@ class ExploreManager {
 
     this.walkCycle = 0;
     this.lastBg = 0;
+
+    // Ambient life: footstep dust puffs + free-roaming ward motes that scatter
+    // away from the player. Motes seeded deterministically (no Math.random in
+    // fixed positions needed, but a one-time spread at construction is fine).
+    this.dust = [];
+    this.dustTimer = 0;
+    this.motes = Array.from({ length: 18 }, () => ({
+      x: 32 + Math.random() * 836,
+      y: 70 + Math.random() * 495,
+      phase: Math.random() * 6.28,
+      speed: 8 + Math.random() * 10,
+      blink: 1 + Math.random() * 2,
+      gold: Math.random() < 0.4,
+    }));
   }
 
   init(savedData) {
@@ -2239,6 +2253,15 @@ class ExploreManager {
       this.animTimer += dt;
       if (this.animTimer > 0.2) { this.animTimer = 0; this.walkCycle = (this.walkCycle + 1) % 4; }
 
+      // Footstep dust: a little puff kicked up behind the walking sprite.
+      this.dustTimer += dt;
+      if (this.dustTimer >= 0.14) {
+        this.dustTimer = 0;
+        this.dust.push({ x: this.playerX + (Math.random() * 10 - 5), y: this.playerY + 20,
+                         life: 0.5, r: 2 + Math.random() * 2 });
+        if (this.dust.length > 24) this.dust.shift();
+      }
+
       // Check encounter zones
       this.encounter_zones.forEach(zone => {
         if (zone.used) return;
@@ -2249,6 +2272,25 @@ class ExploreManager {
         }
       });
     }
+
+    this._updateAmbient(dt, W, H);
+  }
+
+  // Drift the ward motes (scattering away from the player) and decay dust.
+  _updateAmbient(dt, W, H) {
+    this.motes.forEach(m => {
+      m.x += Math.cos(m.phase) * m.speed * dt;
+      m.y += Math.sin(m.phase * 0.7) * m.speed * 0.6 * dt;
+      m.phase += dt * 0.4;
+      // Scatter from the player
+      const ddx = m.x - this.playerX, ddy = m.y - this.playerY;
+      const d = Math.hypot(ddx, ddy);
+      if (d < 55 && d > 0.01) { m.x += (ddx / d) * 40 * dt; m.y += (ddy / d) * 40 * dt; }
+      // Wrap within the play area
+      if (m.x < 32) m.x = W - 32; else if (m.x > W - 32) m.x = 32;
+      if (m.y < 70) m.y = H - 32; else if (m.y > H - 32) m.y = 70;
+    });
+    this.dust = this.dust.filter(d => { d.life -= dt; d.r += dt * 4; return d.life > 0; });
   }
 
   triggerBattle(enemyIds, bgKey, zone) {
@@ -2452,6 +2494,14 @@ class ExploreManager {
 
     // ── Layer 6: NPC (Elder Ward) ───────────────────────────
     this._renderNPCs(ctx, t, glow);
+
+    // ── Layer 6.5: Footstep dust (under the sprite) ─────────
+    this.dust.forEach(d => {
+      ctx.fillStyle = `rgba(190,170,255,${d.life * 0.4})`;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r * (1 + (0.5 - d.life)), 0, Math.PI * 2);
+      ctx.fill();
+    });
 
     // ── Layer 7: Player ─────────────────────────────────────
     this.renderPlayer(ctx, t);
@@ -3087,6 +3137,22 @@ class ExploreManager {
       ctx.ellipse(mx, my, 80, 25, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // Free-roaming ward motes (fireflies) — blink and drift, scatter from the
+    // player (positions updated in _updateAmbient). Uses the game-level `t`;
+    // ExploreManager.animTimer resets every 0.2s for the walk cycle.
+    this.motes.forEach(m => {
+      const a = 0.1 + 0.45 * Math.max(0, Math.sin(t * m.blink + m.phase));
+      if (a <= 0.02) return;
+      const core = m.gold ? '255,215,130' : '190,130,255';
+      const halo = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, 8);
+      halo.addColorStop(0, `rgba(${core},${a * 0.5})`);
+      halo.addColorStop(1, `rgba(${core},0)`);
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(m.x, m.y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(${core},${a})`;
+      ctx.beginPath(); ctx.arc(m.x, m.y, 2, 0, Math.PI * 2); ctx.fill();
+    });
   }
 
   renderPlayer(ctx, t = 0) {
