@@ -58,6 +58,7 @@
     "id": "blaze_lion",
     "name": "Blaze Lion",
     "type": "Inferno",
+    "boss": true,
     "portrait": "assets/enemies/blaze_lion.png",
     "stats": {
       "hp": 110,

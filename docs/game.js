@@ -626,7 +626,7 @@ class WardedOnesGame {
 
     this.battle = new BattleManager(this, this.party.filter(m => m.currentHp > 0), enemies, bgKey, onWin, onLose);
     this.state = STATE.BATTLE;
-    this.audio.playBattleMusic();
+    this.audio.playBattleMusic(enemies.some(e => e.boss));
   }
 
   /** Defeat-screen Retry: restore the pre-battle party and re-run the fight. */
@@ -1017,63 +1017,70 @@ class AudioManager {
     } catch(e) {}
   }
 
-  playBattleMusic() {
-    if (this._musicTrack === 'battle') return;
+  playBattleMusic(isBoss = false) {
+    const track = isBoss ? 'boss' : 'battle';
+    if (this._musicTrack === track) return;
     this.stopMusic();
-    this._musicTrack = 'battle';
+    this._musicTrack = track;
     try {
       this.initContext();
       this._musicNodes = [];
 
-      // Driving bass pulse — E1=41Hz in minor
-      const bassDrone = [41.2, 'sawtooth', 0.09, 0];
-      this._musicNodes.push(...this._makeDrone(...bassDrone));
+      // Boss: lower, denser, phrygian (menacing). Normal: E-minor drive.
+      const cfg = isBoss ? {
+        bass: [36.7, 'sawtooth', 0.10, 0], mid: [73.4, 'sawtooth', 0.05, 7],
+        beat: [1,0,1,1, 0,1,0,1, 1,0,1,1, 0,1,1,0], beatMs: 110,
+        accentHi: 92.5, accentLo: 61.7, beatGain: 0.20,
+        melody: [329.6, 349.2, 392.0, 493.9, 523.3, 493.9], melType: 'sawtooth', melGain: 0.07,
+      } : {
+        bass: [41.2, 'sawtooth', 0.09, 0], mid: [82.4, 'square', 0.04, 5],
+        beat: [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,1,0,0], beatMs: 125,
+        accentHi: 82.4, accentLo: 61.7, beatGain: 0.18,
+        melody: [329.6, 392.0, 493.9, 659.3, 493.9, 392.0], melType: 'square', melGain: 0.055,
+      };
 
-      // Mid tension layer
-      this._musicNodes.push(...this._makeDrone(82.4, 'square', 0.04, 5));
+      this._musicNodes.push(...this._makeDrone(...cfg.bass));
+      this._musicNodes.push(...this._makeDrone(...cfg.mid));
 
-      // Rhythmic stab — 16th-note feel at ~120bpm → 0.125s per 16th
-      // Pattern: kick on 1,3; accent on 2,4 of each beat (4/4 bar = 2s)
-      const beatPattern = [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,1,0,0]; // 16ths
+      const beatPattern = cfg.beat;
       let beatIdx = 0;
       const doBeat = () => {
-        if (this._musicTrack !== 'battle') return;
+        if (this._musicTrack !== track) return;
         try {
           if (beatPattern[beatIdx % beatPattern.length]) {
             this.initContext();
             const osc = this.ctx.createOscillator();
             const g = this.ctx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.value = beatIdx % 8 === 0 ? 82.4 : 61.7; // accent variation
+            osc.frequency.value = beatIdx % 8 === 0 ? cfg.accentHi : cfg.accentLo;
             osc.connect(g);
             g.connect(this.ctx.destination);
             const now = this.ctx.currentTime;
-            g.gain.setValueAtTime(0.18 * this.musicVol * this.masterVol, now);
+            g.gain.setValueAtTime(cfg.beatGain * this.musicVol * this.masterVol, now);
             g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
             osc.start(now);
             osc.stop(now + 0.12);
           }
         } catch(e) {}
         beatIdx++;
-        this._beatTimeout = setTimeout(doBeat, 125); // 16th note at ~120bpm
+        this._beatTimeout = setTimeout(doBeat, cfg.beatMs);
       };
       doBeat();
 
-      // High-tension melodic stabs — E minor arpeggio: E4 G4 B4 E5
-      const battleMelody = [329.6, 392.0, 493.9, 659.3, 493.9, 392.0];
+      const battleMelody = cfg.melody;
       let mIdx = 0;
       const doMelody = () => {
-        if (this._musicTrack !== 'battle') return;
+        if (this._musicTrack !== track) return;
         try {
           this.initContext();
           const osc = this.ctx.createOscillator();
           const g = this.ctx.createGain();
-          osc.type = 'square';
+          osc.type = cfg.melType;
           osc.frequency.value = battleMelody[mIdx % battleMelody.length];
           osc.connect(g);
           g.connect(this.ctx.destination);
           const now = this.ctx.currentTime;
-          g.gain.setValueAtTime(0.055 * this.musicVol * this.masterVol, now);
+          g.gain.setValueAtTime(cfg.melGain * this.musicVol * this.masterVol, now);
           g.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
           osc.start(now);
           osc.stop(now + 0.3);
@@ -3994,6 +4001,7 @@ class BattleManager {
       this.phase = 'VICTORY';
       this.calcRewards();
       this.game.state = STATE.VICTORY;
+      this.game.audio.stopMusic();   // silence the battle drones under the jingle
       this.game.audio.playVictory();
       const canvas = document.getElementById('game-canvas');
       this.spawnVictoryBurst(canvas.width / 2, canvas.height * 0.35);
@@ -4003,6 +4011,7 @@ class BattleManager {
     if (allPartyDead) {
       this.phase = 'DEFEAT';
       this.game.state = STATE.DEFEAT;
+      this.game.audio.stopMusic();   // silence the battle drones under the jingle
       this.game.audio.playDefeat();
       return true;
     }
