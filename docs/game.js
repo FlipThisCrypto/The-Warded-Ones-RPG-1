@@ -375,6 +375,52 @@ class WardedOnesGame {
     ctx.font = `${Math.floor(W * 0.011)}px monospace`;
     ctx.fillStyle = 'rgba(150, 110, 200, 0.55)';
     ctx.fillText('P — replay the prologue flight', W / 2, H * 0.92);
+
+    // Overwrite-save confirmation modal (drawn last, over everything)
+    if (this.ui && this.ui.confirmDialog) this._renderConfirmDialog(ctx, W, H);
+  }
+
+  _renderConfirmDialog(ctx, W, H) {
+    const cd = this.ui.confirmDialog;
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, W, H);
+    const boxW = 460, boxH = 210, bx = (W - boxW) / 2, by = (H - boxH) / 2;
+    drawRoundedRect(ctx, bx, by, boxW, boxH, 12, 'rgba(14,6,32,0.98)', 'rgba(200,120,255,0.85)', 2);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f0c060';
+    ctx.font = `bold 22px 'Cinzel', serif`;
+    ctx.fillText('Overwrite your save?', W / 2, by + 46);
+
+    ctx.fillStyle = '#c8b0e8';
+    ctx.font = '13px Georgia, serif';
+    ctx.fillText('Starting a new game will overwrite your existing save.', W / 2, by + 78);
+    if (this.game.saveMeta) {
+      ctx.fillStyle = 'rgba(160,120,210,0.85)';
+      ctx.font = '12px monospace';
+      ctx.fillText(`Current save — ${this.game.saveMeta}`, W / 2, by + 100);
+    }
+
+    // Two option buttons — "No" is the safe default (choice 1)
+    const btnW = 180, btnH = 44, gap = 24, btnY = by + 132;
+    const yesX = W / 2 - btnW - gap / 2, noX = W / 2 + gap / 2;
+    cd.yesRect = { x: yesX, y: btnY, w: btnW, h: btnH };
+    cd.noRect = { x: noX, y: btnY, w: btnW, h: btnH };
+    const drawBtn = (r, label, selected, danger) => {
+      drawRoundedRect(ctx, r.x, r.y, r.w, r.h, 8,
+        selected ? (danger ? 'rgba(120,30,40,0.9)' : 'rgba(40,80,50,0.9)') : 'rgba(30,18,50,0.9)',
+        selected ? (danger ? '#ff8080' : '#80e0a0') : 'rgba(120,80,180,0.5)', 2);
+      ctx.fillStyle = selected ? '#ffffff' : '#b0a0d0';
+      ctx.font = `${selected ? 'bold ' : ''}14px 'Cinzel', serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, r.x + r.w / 2, r.y + 28);
+    };
+    drawBtn(cd.yesRect, 'Yes, start over', cd.choice === 0, true);
+    drawBtn(cd.noRect, 'No, keep my save', cd.choice === 1, false);
+
+    ctx.fillStyle = 'rgba(150,110,200,0.6)';
+    ctx.font = '10px monospace';
+    ctx.fillText('← → choose    ENTER confirm    ESC cancel', W / 2, by + boxH - 14);
   }
 
   // ─── Particle System ──────────────────────────────────────
@@ -738,6 +784,16 @@ class InputManager {
     const s0 = g.state;
 
     if (s0 === STATE.TITLE) {
+      if (ui.confirmDialog) {
+        // Overwrite-save confirmation owns the keys while open
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'ArrowRight' || e.code === 'KeyD') {
+          ui.confirmDialog.choice = ui.confirmDialog.choice === 0 ? 1 : 0;
+          g.audio.playCursor();
+        }
+        if (e.code === 'Enter' || e.code === 'Space') { ui.resolveConfirmDialog(ui.confirmDialog.choice === 0); }
+        if (e.code === 'Escape' || e.code === 'KeyX') { ui.resolveConfirmDialog(false); }
+        return;
+      }
       if (e.code === 'ArrowUp' || e.code === 'KeyW') { ui.titleSelection = Math.max(0, ui.titleSelection - 1); }
       if (e.code === 'ArrowDown' || e.code === 'KeyS') { ui.titleSelection = Math.min(2, ui.titleSelection + 1); }
       if (e.code === 'Enter' || e.code === 'Space') { ui.confirmTitleSelection(); }
@@ -1031,17 +1087,38 @@ class UI {
     this.notifTimer = 0;
     this.pauseSelection = 0;
     this.pauseItems = ['Resume', 'Save Game', 'Main Menu', 'Music Vol', 'SFX Vol'];
+    // { choice: 0=Yes / 1=No, yesRects/noRects populated on render }
+    this.confirmDialog = null;
   }
 
   confirmTitleSelection() {
     const g = this.game;
-    g.audio.playConfirm();
-    if (this.titleSelection === 0) { g.startNewGame(); }
+    if (this.titleSelection === 0) {
+      // New Game over an existing save is destructive — the first auto-save
+      // would overwrite it. Confirm first (default to the safe "No").
+      if (g.saveExists) {
+        g.audio.playConfirm();
+        this.confirmDialog = { choice: 1, yesRect: null, noRect: null };
+        return;
+      }
+      g.audio.playConfirm();
+      g.startNewGame();
+    }
     else if (this.titleSelection === 1 && g.saveExists) {
+      g.audio.playConfirm();
       if (!g.load()) { this.showNotification('Load failed!'); }
     } else if (this.titleSelection === 2) {
+      g.audio.playConfirm();
       this.showNotification('Settings — coming soon!');
     }
+  }
+
+  // Resolve the New Game overwrite confirmation. choice 0 = start over.
+  resolveConfirmDialog(accept) {
+    const g = this.game;
+    this.confirmDialog = null;
+    if (accept) { g.audio.playConfirm(); g.startNewGame(); }
+    else { g.audio.playCancel(); }
   }
 
   showNotification(text) {
@@ -3100,6 +3177,34 @@ class ExploreManager {
   }
 }
 
+// ─── Ability elements (drives impact VFX + damage-number colour) ─────
+// Classified in code rather than duplicated across 21 JSON entries.
+const ELEMENT_FX = {
+  fire:      { color: '#ff6a20', num: '#ff9a4a', shape: 'ember' },
+  ice:       { color: '#54d4ff', num: '#9ee6ff', shape: 'shard' },
+  lightning: { color: '#ffe24a', num: '#fff29a', shape: 'spark' },
+  shadow:    { color: '#a86ae6', num: '#c79aff', shape: 'smoke' },
+  arcane:    { color: '#ff6aff', num: '#ff9aff', shape: 'star'  },
+  physical:  { color: '#ffb060', num: '#ff8464', shape: 'slash' },
+  heal:      { color: '#54ff92', num: '#7dff9a', shape: 'rise'  },
+};
+const ELEMENT_BY_ID = {
+  flame_claw: 'fire', inferno_roar: 'fire',
+  frost_breath: 'ice', blizzard_roar: 'ice',
+  lightning_strike: 'lightning', storm_dash: 'lightning',
+  shadow_web: 'shadow', void_drain: 'shadow', shadow_pounce: 'shadow',
+  arcane_burst: 'arcane', jester_gambit: 'arcane', wild_card: 'arcane',
+  marionette: 'arcane', shuffle: 'arcane', healing_jig: 'heal',
+};
+function abilityElement(def) {
+  if (!def) return 'physical';
+  if (def.id && ELEMENT_BY_ID[def.id]) return ELEMENT_BY_ID[def.id];
+  if (def.type === 'heal') return 'heal';
+  if (def.effect === 'burn') return 'fire';
+  if (def.effect === 'freeze') return 'ice';
+  return 'physical';
+}
+
 // ─── Battle Manager ──────────────────────────────────────────
 class BattleManager {
   constructor(game, party, enemies, bgKey, onWin, onLose) {
@@ -3138,6 +3243,9 @@ class BattleManager {
     this.actionAnnounce = null;    // { text, timer, maxTimer, color }
     this.victoryParticles = [];    // burst on win
     this.battleParticles = [];     // cast/hit particle systems
+    this.impactParticles = [];     // per-element hit bursts (embers, shards, …)
+    this.critFlash = 0;            // full-screen flash on a critical hit
+    this._lastCrit = false;        // set by calcDamage, read by its callers
     this.enemyPositions = [];      // set each render frame, used by fx spawners
     this.partyPositions = [];
     this.lungeOffsets = {};        // id → { dx, dy, life 0→1 }
@@ -3342,7 +3450,8 @@ class BattleManager {
       this.addLog(`${target.name} recovers ${healAmt} HP!`);
       this.game.audio.playHeal();
       const pos = getPos(target);
-      this.spawnFloat(pos.x, pos.y - 30, `+${healAmt}`, '#60ff80');
+      this.spawnImpactBurst(pos.x, pos.y, 'heal');
+      this.spawnFloat(pos.x, pos.y - 30, `+${healAmt}`, ELEMENT_FX.heal.num);
       return;
     }
 
@@ -3352,8 +3461,9 @@ class BattleManager {
       actor.currentHp = Math.min(actor.stats.hp, actor.currentHp + Math.floor(dmg * 0.5));
       this.addLog(`${target.name} takes ${dmg} damage! ${actor.name} absorbs ${Math.floor(dmg*0.5)} HP!`);
       const tPos = getPos(target);
-      this.spawnFloat(tPos.x, tPos.y - 30, dmg, '#c060ff');
-      this.spawnHitFlash(target.id);
+      this.spawnImpactBurst(tPos.x, tPos.y, 'shadow');
+      this.spawnFloat(tPos.x, tPos.y - 30, dmg, ELEMENT_FX.shadow.num);
+      this.spawnHitFlash(target.id, ELEMENT_FX.shadow.color);
       this.shakeX = 5; this.shakeY = 3;
       return;
     }
@@ -3406,29 +3516,25 @@ class BattleManager {
       return;
     }
 
+    const crit = this._lastCrit;
     const prevHp = target.currentHp;
     target.currentHp = Math.max(0, target.currentHp - dmg);
     const defeated = target.currentHp <= 0 && prevHp > 0;
-    this.addLog(`${target.name} takes ${dmg} damage!${defeated ? ' Defeated!' : ''}`);
-    this.game.audio.playHit();
+    this.addLog(`${crit ? 'Critical hit! ' : ''}${target.name} takes ${dmg} damage!${defeated ? ' Defeated!' : ''}`);
+    if (crit) { this.playCrit(); } else { this.game.audio.playHit(); }
 
-    // Shake: heavier for big hits
-    const shakeMag = Math.min(12, 4 + dmg * 0.15);
+    // Shake: heavier for big hits, and for crits
+    const shakeMag = Math.min(16, (crit ? 10 : 4) + dmg * 0.15);
     this.shakeX = shakeMag;
     this.shakeY = shakeMag * 0.5;
 
-    // Determine particle color by ability metadata
-    let hitColor = '#ffaa33';
-    if (abilityDef.id?.includes('fire') || abilityDef.id?.includes('blaze') || abilityDef.effect?.includes('burn')) {
-      hitColor = '#ff5500';
-    } else if (abilityDef.id?.includes('ice') || abilityDef.id?.includes('frost') || abilityDef.effect?.includes('freeze')) {
-      hitColor = '#00f0ff';
-    } else if (abilityDef.effect === 'heal' || abilityDef.effect === 'heal_mp') {
-      hitColor = '#80ff80';
-    } else if (abilityDef.id?.includes('gambit') || abilityDef.effect === 'random_power') {
-      hitColor = '#ff00ff';
-    }
-    this.spawnHitFlash(target.id || target.name, hitColor);
+    // Per-element impact burst + flash
+    const element = abilityElement(abilityDef);
+    const fx = ELEMENT_FX[element];
+    const pos = getPos(target);
+    this.spawnImpactBurst(pos.x, pos.y, element);
+    this.spawnHitFlash(target.id || target.name, fx.color);
+    if (crit) { this.setActionAnnounce('CRITICAL!', '#ffee00'); this.critFlash = 0.4; }
 
     // Lunge: actor charges toward target
     const actorId = actor.id || actor.name;
@@ -3441,11 +3547,9 @@ class BattleManager {
     // Death fade when defeated
     if (defeated) this.spawnDeathFade(target.id || target.name);
 
-    // Floating damage number — color by context
-    const pos = getPos(target);
-    const isCrit = abilityDef.effect === 'random_power' && dmg > 30;
-    const numColor = defeated ? '#ff4040' : isCrit ? '#ffee00' : isPlayer ? '#ff8060' : '#ff4040';
-    this.spawnFloat(pos.x, pos.y - 40, dmg, numColor, isCrit || defeated);
+    // Floating damage number — element-tinted, gold on a crit
+    const numColor = defeated ? '#ff4040' : crit ? '#ffee00' : fx.num;
+    this.spawnFloat(pos.x, pos.y - 40, crit ? `${dmg}!` : dmg, numColor, crit || defeated);
 
     // Apply status effect from attack
     if (abilityDef.effect && abilityDef.type === 'attack' && Math.random() < 0.6) {
@@ -3474,8 +3578,16 @@ class BattleManager {
       this.addLog(`${power > 1.5 ? '✨ Critical hit!' : power < 0.8 ? '💨 Weak...' : 'Hit!'}`);
     }
 
-    const base = Math.max(1, (atk - effectiveDef) * power);
+    let base = Math.max(1, (atk - effectiveDef) * power);
     const variance = abilityDef.variance ? base * abilityDef.variance : base * 0.1;
+
+    // Critical hit driven by the otherwise-unused LCK stat. Stored on the
+    // instance so the three callers (resolveHit x2, executePlayerAttack) can
+    // read it without changing calcDamage's numeric return contract.
+    const critChance = 0.05 + (actor.stats?.lck || 0) * 0.01;
+    this._lastCrit = Math.random() < critChance;
+    if (this._lastCrit) base *= 1.7;
+
     return Math.max(1, Math.floor(base + (Math.random() - 0.5) * 2 * variance));
   }
 
@@ -3552,6 +3664,36 @@ class BattleManager {
     }
   }
 
+  // Per-element impact burst at a hit point. Each element gets its own
+  // motion + shape so abilities read distinctly at the moment of contact.
+  spawnImpactBurst(x, y, element) {
+    const fx = ELEMENT_FX[element] || ELEMENT_FX.physical;
+    const shape = fx.shape;
+    const n = shape === 'slash' ? 8 : 14;
+    for (let i = 0; i < n; i++) {
+      const a = (Math.PI * 2 * i) / n + Math.random() * 0.4;
+      let vx = Math.cos(a), vy = Math.sin(a), spd, grav, life, size;
+      if (shape === 'ember')      { spd = 30 + Math.random()*50; vy = -Math.abs(vy)*0.6 - 0.4; grav = -40; life = 0.6; size = 2+Math.random()*2; }
+      else if (shape === 'shard') { spd = 60 + Math.random()*90; grav = 260;                   life = 0.5; size = 2+Math.random()*2; }
+      else if (shape === 'spark') { spd = 120 + Math.random()*140; grav = 0;                    life = 0.28; size = 1.5+Math.random()*1.5; }
+      else if (shape === 'smoke') { spd = 14 + Math.random()*24; grav = -10;                    life = 0.8; size = 4+Math.random()*4; }
+      else if (shape === 'star')  { spd = 40 + Math.random()*90; grav = 0;                      life = 0.6; size = 2+Math.random()*2; }
+      else if (shape === 'rise')  { spd = 20 + Math.random()*30; vy = -Math.abs(vy)-0.5; grav = -30; life = 0.7; size = 2+Math.random()*2; }
+      else /* slash */            { spd = 90 + Math.random()*120; grav = 40;                     life = 0.32; size = 2+Math.random()*2; }
+      this.impactParticles.push({
+        x, y, vx: vx * spd, vy: vy * spd, grav, life, maxLife: life, size, shape,
+        color: fx.color,
+      });
+    }
+  }
+
+  playCrit() {
+    // Two quick hit bursts an octave apart, plus a bright ring.
+    this.game.audio.playTone(220, 0.08, 'square', 0.28);
+    setTimeout(() => this.game.audio.playTone(660, 0.14, 'square', 0.24), 55);
+    setTimeout(() => this.game.audio.playTone(990, 0.10, 'sine', 0.18), 110);
+  }
+
   setActionAnnounce(text, color = '#f0d080') {
     this.actionAnnounce = { text, timer: 1.2, maxTimer: 1.2, color };
   }
@@ -3596,6 +3738,18 @@ class BattleManager {
       return p.life > 0;
     });
 
+    // Impact particles (per-element hit bursts)
+    this.impactParticles = this.impactParticles.filter(p => {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += p.grav * dt;
+      p.life -= dt;
+      return p.life > 0;
+    });
+
+    // Crit flash decay
+    if (this.critFlash > 0) this.critFlash = Math.max(0, this.critFlash - dt * 2);
+
     // Shake decay
     if (this.shakeX > 0.2) this.shakeX *= 0.75; else this.shakeX = 0;
     if (this.shakeY > 0.2) this.shakeY *= 0.75; else this.shakeY = 0;
@@ -3621,6 +3775,49 @@ class BattleManager {
 
   // ─── FX Render ────────────────────────────────────────────
   renderFx(ctx) {
+    // Crit flash — brief screen-wide gold tint (behind the numbers)
+    if (this.critFlash > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,238,150,${this.critFlash * 0.5})`;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
+
+    // Impact particles (under the numbers, over the portraits)
+    this.impactParticles.forEach(p => {
+      const a = Math.max(0, Math.min(1, p.life / p.maxLife));
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.strokeStyle = p.color;
+      if (p.shape === 'shard' || p.shape === 'spark' || p.shape === 'slash') {
+        // draw as a short streak along its velocity
+        const len = p.shape === 'spark' ? 10 : 7;
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        ctx.lineWidth = p.size * 0.6;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - (p.vx / sp) * len, p.y - (p.vy / sp) * len);
+        ctx.stroke();
+      } else if (p.shape === 'smoke') {
+        ctx.globalAlpha = a * 0.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * (1 + (1 - a)), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.shape === 'star') {
+        ctx.globalAlpha = a * (0.5 + 0.5 * Math.sin(p.life * 30));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      } else { // ember / rise / dot
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+
     // Floating texts
     this.floatingTexts.forEach(ft => {
       const alpha = Math.min(1, ft.life * 1.5);
@@ -3810,6 +4007,7 @@ class BattleManager {
 
     // Basic attack
     const dmg = this.calcDamage(member, target, { power: 1.0 });
+    const crit = this._lastCrit;
     if (target.shieldAmount > 0) {
       const blocked = Math.min(target.shieldAmount, dmg);
       target.shieldAmount -= blocked;
@@ -3818,15 +4016,19 @@ class BattleManager {
     const prevHp = target.currentHp;
     target.currentHp = Math.max(0, target.currentHp - effectiveDmg);
     const defeated = target.currentHp <= 0 && prevHp > 0;
-    this.addLog(`${member.name} attacks ${target.name} for ${effectiveDmg}!${defeated ? ' Defeated!' : ''}`);
-    this.game.audio.playAttack();
-    this.shakeX = 6; this.shakeY = 3;
-    this.spawnHitFlash(target.id || target.name);
+    this.addLog(`${crit ? 'Critical hit! ' : ''}${member.name} attacks ${target.name} for ${effectiveDmg}!${defeated ? ' Defeated!' : ''}`);
+    if (crit) { this.playCrit(); } else { this.game.audio.playAttack(); }
+    const shakeMag = crit ? 12 : 6;
+    this.shakeX = shakeMag; this.shakeY = shakeMag * 0.5;
+    const ePos = this.enemyPositions.find(p => p.id === (target.id || target.name)) || { x: 450, y: 200 };
+    this.spawnImpactBurst(ePos.x, ePos.y, 'physical');
+    this.spawnHitFlash(target.id || target.name, crit ? '#ffee00' : ELEMENT_FX.physical.color);
     this.spawnLunge(member.id || member.name, 30, -20); // party lunges up-right toward enemies
     if (defeated) this.spawnDeathFade(target.id || target.name);
-    const ePos = this.enemyPositions.find(p => p.id === (target.id || target.name));
-    if (ePos) this.spawnFloat(ePos.x, ePos.y - 40, effectiveDmg, defeated ? '#ff4040' : '#ff8060', defeated);
-    this.setActionAnnounce('ATTACK', '#ff8060');
+    const numColor = defeated ? '#ff4040' : crit ? '#ffee00' : ELEMENT_FX.physical.num;
+    this.spawnFloat(ePos.x, ePos.y - 40, crit ? `${effectiveDmg}!` : effectiveDmg, numColor, crit || defeated);
+    if (crit) { this.setActionAnnounce('CRITICAL!', '#ffee00'); this.critFlash = 0.4; }
+    else this.setActionAnnounce('ATTACK', '#ff8060');
     this.subMenu = null;
 
     if (!this.checkBattleEnd()) this.endPlayerTurn();
@@ -4570,6 +4772,14 @@ function setupClickHandler(game, canvas) {
     const W = canvas.width, H = canvas.height;
 
     if (game.state === STATE.TITLE) {
+      // Overwrite-save confirmation intercepts clicks while open
+      const cd = game.ui.confirmDialog;
+      if (cd) {
+        const inRect = (r) => r && cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h;
+        if (inRect(cd.yesRect)) game.ui.resolveConfirmDialog(true);
+        else if (inRect(cd.noRect)) game.ui.resolveConfirmDialog(false);
+        return;
+      }
       const menuY = [H * 0.48, H * 0.56, H * 0.64];
       let hitMenu = false;
       menuY.forEach((my, i) => {
