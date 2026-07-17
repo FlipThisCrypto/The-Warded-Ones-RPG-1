@@ -687,8 +687,14 @@ class WardedOnesGame {
     quest.complete = true;
     const rewards = quest.rewards;
     this.gold += rewards.gold || 0;
+    const levelUps = [];
     this.party.forEach(m => {
-      this.grantExp(m, rewards.exp || 0);
+      const ups = this.grantExp(m, rewards.exp || 0);
+      if (ups.length) {
+        const gains = {};
+        ups.forEach(u => Object.keys(u.gains).forEach(k => { gains[k] = (gains[k] || 0) + u.gains[k]; }));
+        levelUps.push({ name: m.name, level: m.level, levels: ups.length, gains });
+      }
     });
     rewards.items?.forEach(itemId => {
       this.addItem(itemId);
@@ -701,7 +707,7 @@ class WardedOnesGame {
         this.ui.showNotification(`New quest: ${next.title || next.id}!`);
       }
     }
-    this.ui.questCompleteData = { quest, rewards };
+    this.ui.questCompleteData = { quest, rewards, levelUps };
     this.state = STATE.QUEST_COMPLETE;
     this.save();
   }
@@ -736,12 +742,15 @@ class WardedOnesGame {
   }
 
   // ─── Level/EXP ────────────────────────────────────────────
+  // Returns an array of per-level results (with stat gains) for fanfare.
   grantExp(member, amount) {
     member.exp += amount;
+    const ups = [];
     while (member.exp >= member.expToNext) {
       member.exp -= member.expToNext;
-      this.levelUp(member);
+      ups.push(this.levelUp(member));
     }
+    return ups;
   }
 
   levelUp(member) {
@@ -758,7 +767,7 @@ class WardedOnesGame {
     member.currentMp = Math.min(member.currentMp + g.mp, member.stats.mp);
     member.expToNext = Math.floor(member.expToNext * 1.4);
     this.audio.playLevelUp();
-    return { level: member.level, name: member.name };
+    return { level: member.level, name: member.name, gains: { ...g } };
   }
 }
 
@@ -1280,7 +1289,8 @@ class UI {
     ctx.fillRect(0, 0, W, H);
     this.game.renderParticles(ctx);
 
-    const boxW = 560, boxH = 400;
+    const luN = this.questCompleteData?.levelUps?.length || 0;
+    const boxW = 560, boxH = 400 + (luN ? luN * 20 + 10 : 0);
     const bx = (W - boxW) / 2, by = (H - boxH) / 2;
     drawRoundedRect(ctx, bx, by, boxW, boxH, 16, 'rgba(10,5,40,0.97)', 'rgba(200,150,255,0.9)', 2);
 
@@ -1317,6 +1327,18 @@ class UI {
           return def ? def.name : id;
         }).join(', ');
         ctx.fillText(`Item: ${itemNames}`, W / 2, by + 285);
+      }
+
+      // Level-ups from the quest EXP (previously silent)
+      if (data.levelUps && data.levelUps.length) {
+        let ly = by + 315;
+        ctx.font = 'bold 13px Cinzel, serif';
+        data.levelUps.forEach(lu => {
+          ctx.fillStyle = '#f0c060';
+          const txt = lu.levels > 1 ? `✨ ${lu.name} → Level ${lu.level} (+${lu.levels})` : `✨ ${lu.name} → Level ${lu.level}`;
+          ctx.fillText(txt, W / 2, ly);
+          ly += 20;
+        });
       }
     }
 
@@ -3131,12 +3153,12 @@ class ExploreManager {
     const startX = W - barW - 20;
 
     party.forEach((m, i) => {
-      const py = 20 + i * 65;
+      const py = 20 + i * 74;
       const portrait = this.game.images[m.portrait];
 
       // Background
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(startX - 40, py - 5, barW + 60, 55);
+      ctx.fillRect(startX - 40, py - 5, barW + 60, 66);
 
       // Portrait
       if (portrait) {
@@ -3173,6 +3195,21 @@ class ExploreManager {
       ctx.fillStyle = '#80c0ff';
       ctx.font = '9px monospace';
       ctx.fillText(`MP ${m.currentMp}/${m.stats.mp}`, startX, py + 46);
+
+      // EXP bar toward the next level (member.exp/expToNext were tracked but
+      // never shown) — thin gold sliver with the level tag on the right.
+      const expPct = Math.max(0, Math.min(1, m.exp / m.expToNext));
+      ctx.fillStyle = 'rgba(40,30,16,0.85)';
+      ctx.fillRect(startX, py + 50, barW, 4);
+      ctx.fillStyle = '#f0c050';
+      ctx.fillRect(startX, py + 50, barW * expPct, 4);
+      ctx.fillStyle = 'rgba(210,180,120,0.85)';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Lv.${m.level}`, startX + barW, py + 61);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(180,150,100,0.7)';
+      ctx.fillText(`EXP ${m.exp}/${m.expToNext}`, startX, py + 61);
     });
   }
 }
@@ -3919,14 +3956,19 @@ class BattleManager {
     this.game.gold += totalGold;
     items.forEach(id => this.game.addItem(id));
 
-    // Grant EXP and track level-ups
+    // Grant EXP and track level-ups (with stat gains, for the fanfare)
     this.levelUps = [];
     this.game.party.forEach(m => {
       if (m.currentHp <= 0) return;
-      const before = m.level;
-      this.game.grantExp(m, totalExp);
-      if (m.level > before) this.levelUps.push({ name: m.name, level: m.level });
+      const ups = this.game.grantExp(m, totalExp);
+      // One fanfare entry per member: their final level + summed gains.
+      if (ups.length) {
+        const gains = {};
+        ups.forEach(u => Object.keys(u.gains).forEach(k => { gains[k] = (gains[k] || 0) + u.gains[k]; }));
+        this.levelUps.push({ name: m.name, level: m.level, levels: ups.length, gains });
+      }
     });
+    if (this.levelUps.length) setTimeout(() => this.game.audio.playLevelUp(), 650);
 
     // Sync party HP/MP back to game.party
     this.party.forEach(bp => {
@@ -4619,7 +4661,9 @@ class BattleManager {
     this.game.renderParticles(ctx);
     this.renderFx(ctx); // victory particle burst
 
-    const boxW = 500, boxH = 360;
+    // Grow the box to fit level-up stat breakdowns.
+    const luCount = this.levelUps ? this.levelUps.length : 0;
+    const boxW = 500, boxH = 360 + luCount * 40;
     const bx = (W - boxW)/2, by = (H - boxH)/2;
     drawRoundedRect(ctx, bx, by, boxW, boxH, 14, 'rgba(10,5,35,0.97)', 'rgba(200,160,255,0.8)', 2);
 
@@ -4634,32 +4678,50 @@ class BattleManager {
     if (this.rewards) {
       ctx.font = '16px Georgia, serif';
       ctx.fillStyle = '#d0b0ff';
-      ctx.fillText(`EXP: +${this.rewards.exp}`, W/2, by + 110);
+      ctx.fillText(`EXP: +${this.rewards.exp}`, W/2, by + 104);
       ctx.fillStyle = '#f0d060';
-      ctx.fillText(`Gold: +${this.rewards.gold}`, W/2, by + 140);
+      ctx.fillText(`Gold: +${this.rewards.gold}`, W/2, by + 130);
       if (this.rewards.items.length) {
         const names = this.rewards.items.map(id => this.game.getItemDef(id)?.name || id).join(', ');
         ctx.fillStyle = '#80ffcc';
-        ctx.fillText(`Item: ${names}`, W/2, by + 170);
+        ctx.fillText(`Item: ${names}`, W/2, by + 156);
       }
 
-      // Level ups
-      this.levelUps.forEach((lu, i) => {
+      // Level ups — name + concrete stat gains
+      let luy = by + 194;
+      this.levelUps.forEach((lu) => {
         ctx.fillStyle = '#f0c060';
         ctx.font = 'bold 15px Cinzel, serif';
-        ctx.fillText(`✨ ${lu.name} reached Level ${lu.level}!`, W/2, by + 210 + i * 28);
+        const lvlText = lu.levels > 1 ? `✨ ${lu.name} reached Level ${lu.level}! (+${lu.levels})` : `✨ ${lu.name} reached Level ${lu.level}!`;
+        ctx.fillText(lvlText, W/2, luy);
+        const g = lu.gains || {};
+        const parts = [['HP','hp'],['MP','mp'],['ATK','atk'],['DEF','def'],['SPD','spd'],['LCK','lck']]
+          .filter(([,k]) => g[k]).map(([lbl,k]) => `+${g[k]} ${lbl}`);
+        ctx.fillStyle = '#9fd0a0';
+        ctx.font = '11px monospace';
+        ctx.fillText(parts.join('   '), W/2, luy + 17);
+        luy += 40;
       });
 
-      // Party state
+      // Party state — HP + a mini EXP bar toward the next level
       this.party.forEach((m, i) => {
         const px = bx + 40 + i * 150;
-        const py = by + boxH - 90;
+        const py = by + boxH - 96;
         const portrait = this.game.images[m.portrait];
         if (portrait) { ctx.drawImage(portrait, px, py, 50, 50); }
         ctx.fillStyle = m.currentHp <= 0 ? '#606060' : '#a0ff80';
         ctx.font = '11px Georgia';
         ctx.textAlign = 'left';
-        ctx.fillText(`${m.name.split(' ')[0]}: ${m.currentHp}/${m.stats.hp} HP`, px, py + 65);
+        ctx.fillText(`${m.name.split(' ')[0]}: ${m.currentHp}/${m.stats.hp} HP`, px, py + 64);
+        // EXP bar
+        const bw = 110, expPct = Math.max(0, Math.min(1, m.exp / m.expToNext));
+        ctx.fillStyle = 'rgba(40,30,16,0.9)';
+        ctx.fillRect(px, py + 72, bw, 5);
+        ctx.fillStyle = '#f0c050';
+        ctx.fillRect(px, py + 72, bw * expPct, 5);
+        ctx.fillStyle = 'rgba(200,170,110,0.8)';
+        ctx.font = '9px monospace';
+        ctx.fillText(`Lv.${m.level}  EXP ${m.exp}/${m.expToNext}`, px, py + 88);
       });
     }
 
