@@ -1471,52 +1471,84 @@ class DialogueManager {
 // ─── Scroll-Flight Cinematics ────────────────────────────────
 // A scroll-scrubbed camera flight over the live-rendered Warded Grounds:
 // scrolling (mouse wheel / touch drag / W-S keys) drives a continuous camera
-// along a keyframed flight path through story-beat sections, each with pinned
-// copy, a route rail, and a progress bar. Used for the new-game prologue
-// (default config), the finale epilogue (EPILOGUE config), and the title-
-// screen prologue replay.
-// Section keyframes are shared between neighbours so every seam is
-// position-continuous, and per-section easing zeroes camera velocity at the
-// seams (no rewind stutter when the flight changes direction).
+// through story-beat sections, each with pinned copy, a route rail, and a
+// progress bar. Used for the new-game prologue (default config), the finale
+// epilogue (EPILOGUE config), and the title-screen prologue replay.
+//
+// Camera architecture B ("dive + aerial connector") from the scroll-world
+// SKILL, which prescribes it for miniature / diorama / god's-eye worlds —
+// exactly what the top-down Grounds are. The flight is an interleaved chain
+// of segments: each section owns a DIVE that descends onto its subject and
+// holds there while its copy peaks, and consecutive sections are joined by a
+// CONNECTOR that pulls up to a god's-eye overview, glides across the map, and
+// descends into the next subject. (Architecture A — one continuous glide —
+// would peak each section's copy in mid-air between its subjects.)
+//
+// Seams are frame-identical: a connector's endpoints are the *same objects*
+// as its neighbouring dives' poses, and per-segment easing zeroes camera
+// velocity at every seam, so the direction reversal inherent to B reads as an
+// intentional "zoom out to the map, fly to the next island" rather than a
+// rewind stutter.
+//
 // Scrub pacing math — smoothstep, the lingerEase monotone time-remap, the
-// 0.18 chase lerp, the per-section copy opacity curves, and the
-// prefers-reduced-motion fallback — adapted from the scroll-world scrub
-// engine: https://github.com/oso95/scroll-world (MIT).
+// 0.18 chase lerp, the per-section copy opacity curves, the near-section
+// rule, and the prefers-reduced-motion fallback — adapted from the
+// scroll-world scrub engine: https://github.com/oso95/scroll-world (MIT).
 class ScrollFlightManager {
   constructor(game, onComplete, opts = {}) {
     this.game = game;
     this.onComplete = onComplete;
 
-    // Camera keyframes in map coordinates; section i flies K[i] → K[i+1].
-    this.keyframes = opts.keyframes || [
-      { x: 450, y: 300, z: 0.84 },  // high overview of the grounds
-      { x: 450, y: 330, z: 1.35 },  // the great ward circle
-      { x: 430, y: 428, z: 1.50 },  // southern fissures — the guardian dens
-      { x: 720, y: 160, z: 1.60 },  // the Ward Stone pedestal
-      { x: 148, y: 172, z: 1.55 },  // the Elder's alcove
-      { x: 148, y: 176, z: 1.85 },  // slow push-in on the Elder
-    ];
-    // Copy the section objects — configs are shared, but start/end are ours.
+    // A section is a PLACE: `cam` is the arrived pose (close on the subject),
+    // `from` the pose its dive descends from (defaults to higher + pulled back).
+    // Copy the section objects — configs are shared; segment offsets are ours.
     this.sections = (opts.sections || [
       { label: 'The Grounds',   eyebrow: 'THE WARDED ONES',  title: 'The Warded Grounds',
         body: 'For an age the wards have held — quiet stone and patient starlight. Tonight, they tremble.',
-        accent: '#a06cff', w: 1.0,  linger: 0 },
+        accent: '#a06cff', cam: { x: 450, y: 302, z: 1.02 },
+        from: { x: 450, y: 300, z: 0.72 },   // opens on the whole grounds
+        scroll: 1.1, linger: 0.3 },
       { label: 'The Wards',     eyebrow: 'CIRCLES OF POWER', title: 'The circle weakens.',
         body: 'Five rings bound in ancient pact keep the chaos beyond the walls. When they falter, the beasts feel it first.',
-        accent: '#7fd4ff', w: 1.0,  linger: 0.35 },
+        accent: '#7fd4ff', cam: { x: 450, y: 328, z: 1.42 }, linger: 0.4 },
       { label: 'The Guardians', eyebrow: 'ONCE PROTECTORS',  title: 'Guardians turned feral.',
         body: 'The great cats sworn to guard these grounds now stalk the fissures they were meant to seal.',
-        accent: '#ff8a5c', w: 1.15, linger: 0.45 },
+        accent: '#ff8a5c', cam: { x: 430, y: 426, z: 1.52 }, linger: 0.45 },
       { label: 'The Ward Stone', eyebrow: 'THE LAST ANCHOR', title: 'One stone holds the balance.',
         body: 'Claim it, and the wards are restored. Fail, and the grounds fall to the chaos below.',
-        accent: '#ffd166', w: 1.15, linger: 0.45 },
+        accent: '#ffd166', cam: { x: 720, y: 158, z: 1.58 }, linger: 0.45 },
       { label: 'The Elder',     eyebrow: 'YOUR TRIAL BEGINS', title: 'The Elder awaits a Jester.',
         body: 'Chaos answers chaos. A trickster\'s wit may mend what solemn magic cannot.',
-        accent: '#c9a0ff', w: 1.3,  linger: 0.5 },
+        accent: '#c9a0ff', cam: { x: 148, y: 176, z: 1.78 }, scroll: 1.25, linger: 0.5 },
     ]).map(s => ({ ...s }));
     this.endCta = opts.endCta || 'BEGIN THE TRIAL';
+
+    const DIVE_W = opts.diveScroll || 1.0;   // scroll-units per dive
+    const CONN_W = opts.connScroll || 0.85;  // ...per connector
+    // How far the connector pulls up mid-flight. 0.45 → the camera rises to
+    // ~55% zoom at the apex: the whole diorama in frame, then it descends.
+    const CONN_ARC = opts.connArc != null ? opts.connArc : 0.45;
+
+    // Resolve each section's dive-start pose ONCE, so the connector that ends
+    // there and the dive that starts there share the identical object — the
+    // frame-identical seam rule, in camera terms.
+    this.sections.forEach(s => { s._from = s.from || ScrollFlightManager.approach(s.cam); });
+
+    // Interleaved chain: dive0, conn0, dive1, conn1, … diveN-1
+    this.segments = [];
+    this.sections.forEach((s, i) => {
+      const dive = { kind: 'dive', si: i, w: s.scroll || DIVE_W, linger: s.linger || 0,
+                     from: s._from, to: s.cam, arc: 0 };
+      this.segments.push(dive);
+      s._seg = dive;   // the copy for section i is pinned to its dive
+      const next = this.sections[i + 1];
+      if (next) {
+        this.segments.push({ kind: 'conn', si: i, w: CONN_W, linger: 0, arc: CONN_ARC,
+                             from: s.cam, to: next._from });
+      }
+    });
     let off = 0;
-    this.sections.forEach(s => { s.start = off; off += s.w; s.end = off; });
+    this.segments.forEach(sg => { sg.start = off; off += sg.w; sg.end = off; });
     this.totalW = off;
 
     this.scrollTarget = 0;
@@ -1537,31 +1569,30 @@ class ScrollFlightManager {
     this.reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
 
+  // A dive's default start: pulled up (zoomed out) and slightly back, so the
+  // segment reads as a descent onto the subject.
+  static approach(cam) { return { x: cam.x, y: cam.y - 24, z: cam.z * 0.7 }; }
+
   // Finale config: a victory lap over the restored grounds — the live render
   // already shows the claimed Ward Stone, calm Star Sigil, and opened caches.
   static get EPILOGUE() {
     return {
       endCta: 'RETURN TO THE GROUNDS',
-      keyframes: [
-        { x: 450, y: 300, z: 0.84 },  // high overview
-        { x: 450, y: 330, z: 1.35 },  // the ward circle, burning whole
-        { x: 430, y: 428, z: 1.50 },  // the quiet fissures
-        { x: 455, y: 100, z: 1.55 },  // the becalmed Star Sigil
-        { x: 148, y: 174, z: 1.70 },  // the Elder and the company
-      ],
       sections: [
         { label: 'The Wards',     eyebrow: 'THE TRIAL IS OVER',   title: 'The wards hold.',
           body: 'The circle burns whole again — five rings, unbroken, singing beneath the stone.',
-          accent: '#ffd166', w: 1.0, linger: 0.35 },
+          accent: '#ffd166', cam: { x: 450, y: 328, z: 1.38 },
+          from: { x: 450, y: 300, z: 0.78 },   // opens on the whole restored grounds
+          scroll: 1.1, linger: 0.35 },
         { label: 'The Guardians', eyebrow: 'PEACE IN THE GROUNDS', title: 'The guardians rest.',
           body: 'The fissures lie quiet. The great cats keep their watch once more — protectors, not prey.',
-          accent: '#7fd4ff', w: 1.1, linger: 0.45 },
+          accent: '#7fd4ff', cam: { x: 430, y: 426, z: 1.48 }, linger: 0.45 },
         { label: 'The Sigil',     eyebrow: 'THE HUNT IS ENDED',   title: 'The stars stand down.',
           body: 'What walked out of the constellations walks there no longer. The sigil glows soft and calm.',
-          accent: '#8ef0c0', w: 1.1, linger: 0.45 },
+          accent: '#8ef0c0', cam: { x: 455, y: 118, z: 1.52 }, linger: 0.45 },
         { label: 'The Company',   eyebrow: 'WARD-KEEPERS ALL',    title: 'Six Jesters, one legend.',
           body: 'Where one answered the call, a full company now stands. The Elder bows to you.',
-          accent: '#c9a0ff', w: 1.3, linger: 0.5 },
+          accent: '#c9a0ff', cam: { x: 148, y: 176, z: 1.66 }, scroll: 1.25, linger: 0.5 },
       ],
     };
   }
@@ -1576,15 +1607,25 @@ class ScrollFlightManager {
   onWheel(deltaY) { this.scrollTarget = ScrollFlightManager.clamp(this.scrollTarget + deltaY / 700, 0, this.totalW); }
   onDrag(deltaY)  { this.scrollTarget = ScrollFlightManager.clamp(this.scrollTarget + deltaY / 350, 0, this.totalW); }
 
+  segmentAt(u) {
+    let i = 0;
+    for (let k = 0; k < this.segments.length; k++) if (u >= this.segments[k].start) i = k;
+    return i;
+  }
+
+  // Which section the rail/accent should read as current: a dive belongs to
+  // its own section; a connector hands over at its midpoint (scroll-world's
+  // `near` rule).
   sectionAt(u) {
-    let si = 0;
-    for (let i = 0; i < this.sections.length; i++) if (u >= this.sections[i].start) si = i;
-    return si;
+    const sg = this.segments[this.segmentAt(u)];
+    if (sg.kind === 'dive') return sg.si;
+    const local = (u - sg.start) / (sg.end - sg.start);
+    return ScrollFlightManager.clamp(local > 0.5 ? sg.si + 1 : sg.si, 0, this.sections.length - 1);
   }
 
   jumpTo(i) {
-    const s = this.sections[i];
-    this.scrollTarget = s.start + (s.end - s.start) * 0.5;
+    const seg = this.sections[i]._seg;   // settle inside the section's dive
+    this.scrollTarget = seg.start + (seg.end - seg.start) * 0.5;
     this.lastActive = i; // pre-claim the section so the boundary watcher doesn't double-blip
     this.game.audio.playCursor();
   }
@@ -1654,17 +1695,20 @@ class ScrollFlightManager {
   }
 
   cameraAt(u) {
-    const si = this.sectionAt(u);
-    const s = this.sections[si];
-    const local = ScrollFlightManager.clamp((u - s.start) / (s.end - s.start));
-    // smooth() zeroes velocity at both seam edges, so direction changes
-    // between legs never read as a rewind (scroll-world's seam rule).
-    const eased = ScrollFlightManager.smooth(ScrollFlightManager.lingerEase(local, s.linger));
-    const a = this.keyframes[si], b = this.keyframes[si + 1];
+    const sg = this.segments[this.segmentAt(u)];
+    const local = ScrollFlightManager.clamp((u - sg.start) / (sg.end - sg.start));
+    // smooth() zeroes velocity at both seam edges, so the direction reversal
+    // between a dive and a connector never reads as a rewind (the seam rule).
+    const eased = ScrollFlightManager.smooth(ScrollFlightManager.lingerEase(local, sg.linger));
+    const a = sg.from, b = sg.to;
+    // The connector's aerial arc: zoom out to a god's-eye overview at the
+    // apex, then descend. sin(π·t) is exactly 0 at both seams, so the shared
+    // endpoint poses stay frame-identical no matter how big the arc is.
+    const lift = sg.arc ? (1 - sg.arc * Math.sin(Math.PI * eased)) : 1;
     return {
       x: a.x + (b.x - a.x) * eased,
       y: a.y + (b.y - a.y) * eased,
-      z: a.z + (b.z - a.z) * eased,
+      z: (a.z + (b.z - a.z) * eased) * lift,
     };
   }
 
@@ -1718,9 +1762,12 @@ class ScrollFlightManager {
     const accent = this.sections[activeSection].accent;
 
     // ── Pinned copy (opacity curves ported from scroll-world) ──
+    // Copy is pinned to the section's DIVE, so it peaks while the camera is
+    // settled on its subject; connectors are pure transit and show no copy.
     this.sections.forEach((s, i) => {
-      const pr = clamp((u - s.start) / (s.end - s.start));
-      const before = u < s.start, after = u > s.end;
+      const seg = s._seg;
+      const pr = clamp((u - seg.start) / (seg.end - seg.start));
+      const before = u < seg.start, after = u > seg.end;
       let cop;
       if (i === 0) cop = after ? 0 : smooth(1 - pr / 0.62);            // greets on landing
       else if (i === N - 1) cop = before ? 0 : smooth(pr / 0.4);       // holds at the end

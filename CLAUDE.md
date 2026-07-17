@@ -100,7 +100,15 @@ git push origin main
   The class takes an opts config: the finale (the_astral_hunt completion,
   via dismissQuestComplete) plays the EPILOGUE victory-lap config over the
   restored world; P on the title screen replays the prologue. Honors
-  prefers-reduced-motion (instant camera, no drift). Scrub math adapted
+  prefers-reduced-motion (instant camera, no drift).
+  Camera = scroll-world architecture B (the diorama grammar): sections are
+  PLACES (`cam` pose + optional `from`), auto-built into an interleaved
+  dive/connector segment chain. A section's copy pins to its DIVE (so it
+  peaks on-subject); CONNECTORS arc up to a god's-eye overview and descend
+  into the next subject. Seams are frame-identical — a connector's endpoint
+  is the same object as its neighbour dive's pose (`s._from`), and the arc
+  uses sin(π·t), which is 0 at both seams. To add a beat, add a section —
+  segments/offsets rebuild themselves. Scrub math + architecture adapted
   from github.com/oso95/scroll-world (MIT, attributed in the class header)
 
 ## Known Issues (v0.2)
