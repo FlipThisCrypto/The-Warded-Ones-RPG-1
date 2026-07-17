@@ -40,6 +40,7 @@ class WardedOnesGame {
     this.dialogue = null;
     this.explore = null;
     this.prologue = null;
+    this.battleTransition = null;
     this.ui = null;
 
     this.images = {};
@@ -158,6 +159,69 @@ class WardedOnesGame {
     if (this.state === STATE.TITLE) this.updateParticles(dt);
     if (this.state === STATE.BATTLE && this.battle) this.battle.update(dt);
     if (this.state === STATE.PROLOGUE && this.prologue) this.prologue.update(dt);
+    if (this.battleTransition) this.updateBattleTransition(dt);
+  }
+
+  // Ward-circle iris wipe into a battle. The iris closes over the explore
+  // scene; at the midpoint the battle is created (state flips to BATTLE);
+  // then it opens to reveal the fight. Echoes the ward-magic identity.
+  startBattleTransition(enemyIds, bgKey, onWin, onLose) {
+    // Called from explore (directly or after a battle-intro dialogue). Show the
+    // map — not a leftover dialogue box — under the closing iris.
+    this.state = STATE.EXPLORE;
+    this.battleTransition = { t: 0, dur: 1.0, fired: false, args: [enemyIds, bgKey, onWin, onLose] };
+  }
+
+  updateBattleTransition(dt) {
+    const tr = this.battleTransition;
+    tr.t += dt;
+    if (!tr.fired && tr.t >= tr.dur * 0.5) {
+      tr.fired = true;
+      this.startBattle(...tr.args);
+      if (this.battle) this.battle.fadeIn = 0; // the iris IS the intro; skip the battle's own fade
+    }
+    if (tr.t >= tr.dur) this.battleTransition = null;
+  }
+
+  renderBattleTransition(ctx, canvas) {
+    const tr = this.battleTransition;
+    if (!tr) return;
+    const W = canvas.width, H = canvas.height;
+    const p = Math.min(1, tr.t / tr.dur);
+    const maxR = Math.hypot(W / 2, H / 2) + 20;
+    // Closed at the midpoint, open at the ends.
+    const r = maxR * (p < 0.5 ? 1 - p * 2 : (p - 0.5) * 2);
+    const cx = W / 2, cy = H / 2;
+    // Black field with a circular hole (even-odd fill)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2, true); // reverse winding = hole
+    ctx.fillStyle = '#04000c';
+    ctx.fill('evenodd');
+    // Concentric ward rings + rotating spokes at the iris edge
+    const spin = p * 4;
+    for (let ri = 0; ri < 3; ri++) {
+      const rr = r + 8 + ri * 22;
+      ctx.strokeStyle = `rgba(150,80,255,${0.5 - ri * 0.13})`;
+      ctx.lineWidth = 2 - ri * 0.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (r > 8) {
+      ctx.strokeStyle = 'rgba(180,110,255,0.5)';
+      ctx.lineWidth = 1;
+      const spokes = 8;
+      for (let s = 0; s < spokes; s++) {
+        const a = spin + (s / spokes) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        ctx.lineTo(cx + Math.cos(a) * (r + 40), cy + Math.sin(a) * (r + 40));
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   // ─── Rendering ────────────────────────────────────────────
@@ -180,6 +244,9 @@ class WardedOnesGame {
       case STATE.JOURNAL: this.explore.render(ctx, canvas); this.ui.renderJournal(ctx, canvas); break;
       case STATE.PROLOGUE: if (this.prologue) this.prologue.render(ctx, canvas); break;
     }
+    // Iris wipe draws over whatever's rendered (explore before the midpoint,
+    // the battle after it).
+    if (this.battleTransition) this.renderBattleTransition(ctx, canvas);
   }
 
   // ─── Title Screen ─────────────────────────────────────────
@@ -458,6 +525,8 @@ class WardedOnesGame {
 
   // ─── New Game ─────────────────────────────────────────────
   startNewGame() {
+    this.battle = null;
+    this.battleTransition = null; // never carry a pending wipe into a new run
     // Recruitable characters (charDef.recruit) join later via map NPCs.
     this.party = this.data.characters.filter(c => !c.recruit)
       .map(c => this.createPartyMember(c));
@@ -555,6 +624,8 @@ class WardedOnesGame {
     if (!raw) return false;
     try {
       const data = JSON.parse(raw);
+      this.battle = null;
+      this.battleTransition = null;
       this.gold = data.gold || 0;
       this.playtime = data.playtime || 0;
       this.inventory = data.inventory || [];
@@ -2226,6 +2297,9 @@ class ExploreManager {
     const input = g.input;
     const W = canvas.width, H = canvas.height;
 
+    // Freeze the player while the iris wipe closes over the scene.
+    if (g.battleTransition) { this._updateAmbient(dt, W, H); return; }
+
     let dx = 0, dy = 0;
     if (input.isDown('ArrowLeft') || input.isDown('KeyA')) dx -= 1;
     if (input.isDown('ArrowRight') || input.isDown('KeyD')) dx += 1;
@@ -2332,10 +2406,10 @@ class ExploreManager {
     const introKey = enemyIds[0] === 'abyss_tiger' ? 'battle_intro_tiger' : null;
     if (introKey) {
       g.startDialogue(introKey, () => {
-        g.startBattle(enemyIds, bgKey, () => this.onBattleWin(zone), onLose);
+        g.startBattleTransition(enemyIds, bgKey, () => this.onBattleWin(zone), onLose);
       });
     } else {
-      g.startBattle(enemyIds, bgKey, () => this.onBattleWin(zone), onLose);
+      g.startBattleTransition(enemyIds, bgKey, () => this.onBattleWin(zone), onLose);
     }
   }
 
