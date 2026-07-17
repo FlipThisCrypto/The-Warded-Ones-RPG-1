@@ -2119,6 +2119,7 @@ class ExploreManager {
 
     this.walkCycle = 0;
     this.lastBg = 0;
+    this.huntsSpawned = false;   // post-quest replayable hunts (Azure Tiger + Arctic Lion)
 
     // Ambient life: footstep dust puffs + free-roaming ward motes that scatter
     // away from the player. Motes seeded deterministically (no Math.random in
@@ -2160,6 +2161,9 @@ class ExploreManager {
           if (this.encounter_zones[i]) this.encounter_zones[i].used = ez.used;
         });
       }
+      // Recreate the post-quest hunt zones (fresh/un-used — they respawn anyway)
+      // after the base-zone index restore above, so indices stay aligned.
+      if (savedData.huntsSpawned) this.spawnHunts();
     }
   }
 
@@ -2173,6 +2177,7 @@ class ExploreManager {
       npcs: this.npcs.map(n => ({ talked: n.talked })),
       objects: this.objects.map(o => ({ opened: o.opened, defeated: o.defeated })),
       encounter_zones: this.encounter_zones.map(z => ({ used: z.used })),
+      huntsSpawned: this.huntsSpawned,
     };
   }
 
@@ -2280,6 +2285,23 @@ class ExploreManager {
       });
     }
 
+    // Post-quest hunts: spawn once the Trial is complete, then re-arm each
+    // hunt zone after its cooldown — but only once the player has stepped out
+    // of it, so a win doesn't instantly re-trigger.
+    if (!this.huntsSpawned && this.game.quests?.find(q => q.id === 'trial_of_wards')?.complete) {
+      this.spawnHunts();
+      this.game.ui.showNotification('New challengers prowl the grounds…');
+    }
+    this.encounter_zones.forEach(z => {
+      if (!z.hunt || !z.used) return;
+      if (z.cooldown > 0) z.cooldown -= dt;
+      // Re-arm once the cooldown has elapsed AND the player has left the zone,
+      // so a fresh win never instantly re-triggers the same hunt.
+      if (z.cooldown <= 0 && Math.hypot(this.playerX - z.x, this.playerY - z.y) > z.r + 10) {
+        z.used = false;
+      }
+    });
+
     this._updateAmbient(dt, W, H);
   }
 
@@ -2310,14 +2332,22 @@ class ExploreManager {
     const introKey = enemyIds[0] === 'abyss_tiger' ? 'battle_intro_tiger' : null;
     if (introKey) {
       g.startDialogue(introKey, () => {
-        g.startBattle(enemyIds, bgKey, () => this.onBattleWin(), onLose);
+        g.startBattle(enemyIds, bgKey, () => this.onBattleWin(zone), onLose);
       });
     } else {
-      g.startBattle(enemyIds, bgKey, () => this.onBattleWin(), onLose);
+      g.startBattle(enemyIds, bgKey, () => this.onBattleWin(zone), onLose);
     }
   }
 
-  onBattleWin() {
+  onBattleWin(zone) {
+    // Replayable post-quest hunt: no quest progress, just rewards; the zone
+    // re-arms after a cooldown (calcRewards already granted its exp/gold).
+    if (zone && zone.hunt) {
+      zone.cooldown = zone.respawn;
+      this.game.ui.showNotification('Hunt complete! The beast will prowl again…');
+      this.game.save();
+      return;
+    }
     this.battleCount++;
     this.game.incrementQuestCount('trial_of_wards', 'defeat_guardians');
     this.game.ui.showNotification(`Guardian defeated! (${Math.min(this.battleCount, 2)}/2)`);
@@ -2326,6 +2356,17 @@ class ExploreManager {
     if (this.battleCount === 2) {
       this.encounter_zones.push({ x: 750, y: 360, r: 60, enemy: ['blaze_lion'], bg: 'battle_bg3', used: false });
     }
+  }
+
+  // Two idle guardians (Azure Tiger, Arctic Lion) become respawning hunts once
+  // the first quest is done — using enemies fully defined in JSON but unused.
+  spawnHunts() {
+    if (this.huntsSpawned) return;
+    this.huntsSpawned = true;
+    this.encounter_zones.push(
+      { x: 180, y: 300, r: 64, enemy: ['azure_tiger'], bg: 'battle_bg2', used: false, hunt: true, respawn: 12, cooldown: 0 },
+      { x: 720, y: 300, r: 64, enemy: ['arctic_lion'], bg: 'battle_bg',  used: false, hunt: true, respawn: 12, cooldown: 0 },
+    );
   }
 
   onBattleLose() {
