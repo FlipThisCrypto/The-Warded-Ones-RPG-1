@@ -21,6 +21,7 @@ const STATE = {
   QUEST_COMPLETE: 'QUEST_COMPLETE',
   PAUSE: 'PAUSE',
   JOURNAL: 'JOURNAL',
+  PROLOGUE: 'PROLOGUE',
 };
 
 // ─── Main Game Class ──────────────────────────────────────────
@@ -38,6 +39,7 @@ class WardedOnesGame {
     this.battle = null;
     this.dialogue = null;
     this.explore = null;
+    this.prologue = null;
     this.ui = null;
 
     this.images = {};
@@ -155,6 +157,7 @@ class WardedOnesGame {
   update(dt) {
     if (this.state === STATE.TITLE) this.updateParticles(dt);
     if (this.state === STATE.BATTLE && this.battle) this.battle.update(dt);
+    if (this.state === STATE.PROLOGUE && this.prologue) this.prologue.update(dt);
   }
 
   // ─── Rendering ────────────────────────────────────────────
@@ -175,6 +178,7 @@ class WardedOnesGame {
       case STATE.QUEST_COMPLETE: this.ui.renderQuestComplete(ctx, canvas); break;
       case STATE.PAUSE: this.explore.render(ctx, canvas); this.ui.renderPause(ctx, canvas); break;
       case STATE.JOURNAL: this.explore.render(ctx, canvas); this.ui.renderJournal(ctx, canvas); break;
+      case STATE.PROLOGUE: if (this.prologue) this.prologue.render(ctx, canvas); break;
     }
   }
 
@@ -415,13 +419,22 @@ class WardedOnesGame {
     this.quests = JSON.parse(JSON.stringify(this.data.questDefs));
     this.playtime = 0;
 
-    // Start with intro cutscene
-    this.dialogue = new DialogueManager(this, 'intro', () => {
-      this.state = STATE.EXPLORE;
-      this.explore.init();
-      this.audio.playExploreMusic();
+    // Fresh world for a fresh run — the prologue camera renders the map live,
+    // and a reused ExploreManager would leak spent chests/zones/NPC flags from
+    // a previous run into the new game (and soft-lock its quests).
+    // Must come after this.party is set: the constructor syncs recruit NPCs.
+    this.explore = new ExploreManager(this);
+
+    // Scroll-scrubbed prologue flight over the grounds, then the intro cutscene
+    this.prologue = new ScrollFlightManager(this, () => {
+      this.prologue = null;
+      this.dialogue = new DialogueManager(this, 'intro', () => {
+        this.state = STATE.EXPLORE;
+        this.audio.playExploreMusic();
+      });
+      this.state = STATE.CUTSCENE;
     });
-    this.state = STATE.CUTSCENE;
+    this.state = STATE.PROLOGUE;
   }
 
   createPartyMember(charDef) {
@@ -702,6 +715,16 @@ class InputManager {
     if (s0 === STATE.DIALOGUE || s0 === STATE.CUTSCENE) {
       if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyZ') {
         g.dialogue?.advance();
+      }
+    }
+
+    if (s0 === STATE.PROLOGUE && g.prologue && !e.repeat) {
+      // !e.repeat: a held Enter from the title confirm must not auto-blow
+      // through the one-time cinematic (W/S scrubbing polls isDown instead)
+      if (e.code === 'Escape' || e.code === 'KeyX') { g.prologue.skip(); }
+      if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyZ') {
+        if (g.prologue.atEnd()) g.prologue.begin();
+        else g.prologue.advanceSection();
       }
     }
 
@@ -1414,6 +1437,350 @@ class DialogueManager {
 }
 
 // ─── Explore Manager ─────────────────────────────────────────
+// ─── Scroll-Flight Prologue ──────────────────────────────────
+// A scroll-scrubbed camera flight over the Warded Grounds, played when a new
+// game begins: scrolling (mouse wheel / touch drag / W-S keys) drives a
+// continuous camera along a keyframed flight path through five story-beat
+// sections, each with pinned copy, a route rail, and a progress bar.
+// Section keyframes are shared between neighbours so every seam is
+// position-continuous, and per-section easing zeroes camera velocity at the
+// seams (no rewind stutter when the flight changes direction).
+// Scrub pacing math — smoothstep, the lingerEase monotone time-remap, the
+// 0.18 chase lerp, and the per-section copy opacity curves — adapted from
+// the scroll-world scrub engine: https://github.com/oso95/scroll-world (MIT).
+class ScrollFlightManager {
+  constructor(game, onComplete) {
+    this.game = game;
+    this.onComplete = onComplete;
+
+    // Camera keyframes in map coordinates; section i flies K[i] → K[i+1].
+    this.keyframes = [
+      { x: 450, y: 300, z: 0.84 },  // high overview of the grounds
+      { x: 450, y: 330, z: 1.35 },  // the great ward circle
+      { x: 430, y: 428, z: 1.50 },  // southern fissures — the guardian dens
+      { x: 720, y: 160, z: 1.60 },  // the Ward Stone pedestal
+      { x: 148, y: 172, z: 1.55 },  // the Elder's alcove
+      { x: 148, y: 176, z: 1.85 },  // slow push-in on the Elder
+    ];
+    this.sections = [
+      { label: 'The Grounds',   eyebrow: 'THE WARDED ONES',  title: 'The Warded Grounds',
+        body: 'For an age the wards have held — quiet stone and patient starlight. Tonight, they tremble.',
+        accent: '#a06cff', w: 1.0,  linger: 0 },
+      { label: 'The Wards',     eyebrow: 'CIRCLES OF POWER', title: 'The circle weakens.',
+        body: 'Five rings bound in ancient pact keep the chaos beyond the walls. When they falter, the beasts feel it first.',
+        accent: '#7fd4ff', w: 1.0,  linger: 0.35 },
+      { label: 'The Guardians', eyebrow: 'ONCE PROTECTORS',  title: 'Guardians turned feral.',
+        body: 'The great cats sworn to guard these grounds now stalk the fissures they were meant to seal.',
+        accent: '#ff8a5c', w: 1.15, linger: 0.45 },
+      { label: 'The Ward Stone', eyebrow: 'THE LAST ANCHOR', title: 'One stone holds the balance.',
+        body: 'Claim it, and the wards are restored. Fail, and the grounds fall to the chaos below.',
+        accent: '#ffd166', w: 1.15, linger: 0.45 },
+      { label: 'The Elder',     eyebrow: 'YOUR TRIAL BEGINS', title: 'The Elder awaits a Jester.',
+        body: 'Chaos answers chaos. A trickster\'s wit may mend what solemn magic cannot.',
+        accent: '#c9a0ff', w: 1.3,  linger: 0.5 },
+    ];
+    let off = 0;
+    this.sections.forEach(s => { s.start = off; off += s.w; s.end = off; });
+    this.totalW = off;
+
+    this.scrollTarget = 0;
+    this.scrollCur = 0;
+    this.fadeIn = 1.0;
+    this.fadeOut = 0;
+    this.finishing = false;
+    this.done = false;
+    this.lastActive = -1;
+    this._blipCd = 0;
+    this.dotRects = [];   // route-rail hit areas, rebuilt each render
+    this.skipRect = null; // skip-button hit area
+    // Coarse-pointer check (not maxTouchPoints): a touchscreen laptop driven
+    // by mouse+keyboard should still see the wheel/ESC affordances.
+    this.isTouch = !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+  }
+
+  // ── pacing math ported from scroll-world (MIT) ──
+  static clamp(x, a = 0, b = 1) { return Math.min(b, Math.max(a, x)); }
+  static smooth(x) { x = ScrollFlightManager.clamp(x); return x * x * (3 - 2 * x); }
+  // Monotone remap of scroll→time: the camera settles mid-scene (where the
+  // copy peaks) and moves quicker near the seams. f(0)=0, f(1)=1 always.
+  static lingerEase(x, L) { L = ScrollFlightManager.clamp(L); const c = x - 0.5; return (1 - L) * x + L * (4 * c * c * c + 0.5); }
+
+  onWheel(deltaY) { this.scrollTarget = ScrollFlightManager.clamp(this.scrollTarget + deltaY / 700, 0, this.totalW); }
+  onDrag(deltaY)  { this.scrollTarget = ScrollFlightManager.clamp(this.scrollTarget + deltaY / 350, 0, this.totalW); }
+
+  sectionAt(u) {
+    let si = 0;
+    for (let i = 0; i < this.sections.length; i++) if (u >= this.sections[i].start) si = i;
+    return si;
+  }
+
+  jumpTo(i) {
+    const s = this.sections[i];
+    this.scrollTarget = s.start + (s.end - s.start) * 0.5;
+    this.lastActive = i; // pre-claim the section so the boundary watcher doesn't double-blip
+    this.game.audio.playCursor();
+  }
+
+  advanceSection() {
+    const si = this.sectionAt(this.scrollTarget);
+    if (si >= this.sections.length - 1) { this.scrollTarget = this.totalW; return; }
+    this.jumpTo(si + 1);
+  }
+
+  atEnd() { return this.scrollCur > this.totalW - 0.06; }
+
+  begin() {
+    if (this.finishing) return;
+    this.finishing = true;
+    this.game.audio.playConfirm();
+  }
+
+  skip() {
+    if (this.finishing) return;
+    this.finishing = true;
+    this.fadeOut = 0.35; // shorter fade when skipping
+    this.game.audio.playCancel();
+  }
+
+  onClick(cx, cy) {
+    for (let i = 0; i < this.dotRects.length; i++) {
+      const r = this.dotRects[i];
+      if (cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h) { this.jumpTo(i); return; }
+    }
+    const sr = this.skipRect;
+    if (sr && cx > sr.x && cx < sr.x + sr.w && cy > sr.y && cy < sr.y + sr.h) { this.skip(); return; }
+    if (this.atEnd()) this.begin();
+  }
+
+  update(dt) {
+    if (this.done) return;
+    const input = this.game.input;
+    const dir = ((input.isDown('KeyS') || input.isDown('ArrowDown')) ? 1 : 0)
+              - ((input.isDown('KeyW') || input.isDown('ArrowUp')) ? 1 : 0);
+    if (dir) this.scrollTarget = ScrollFlightManager.clamp(this.scrollTarget + dir * dt * 1.1, 0, this.totalW);
+
+    // Chase the target (scroll-world's per-frame 0.18 lerp, dt-normalized)
+    this.scrollCur += (this.scrollTarget - this.scrollCur) * Math.min(1, dt * 60 * 0.18);
+
+    if (this.fadeIn > 0) this.fadeIn = Math.max(0, this.fadeIn - dt * 1.2);
+    if (this.finishing) {
+      this.fadeOut = Math.min(1, this.fadeOut + dt * 1.6);
+      if (this.fadeOut >= 1 && !this.done) {
+        this.done = true;
+        if (this.onComplete) this.onComplete();
+      }
+    }
+
+    if (this._blipCd > 0) this._blipCd -= dt;
+    const active = this.sectionAt(this.scrollCur);
+    if (active !== this.lastActive) {
+      // Cooldown stops seam flap: scroll jitter parked exactly on a section
+      // boundary would otherwise re-blip on every crossing.
+      if (this.lastActive !== -1 && this._blipCd <= 0) {
+        this.game.audio.playCursor();
+        this._blipCd = 0.3;
+      }
+      this.lastActive = active;
+    }
+  }
+
+  cameraAt(u) {
+    const si = this.sectionAt(u);
+    const s = this.sections[si];
+    const local = ScrollFlightManager.clamp((u - s.start) / (s.end - s.start));
+    // smooth() zeroes velocity at both seam edges, so direction changes
+    // between legs never read as a rewind (scroll-world's seam rule).
+    const eased = ScrollFlightManager.smooth(ScrollFlightManager.lingerEase(local, s.linger));
+    const a = this.keyframes[si], b = this.keyframes[si + 1];
+    return {
+      x: a.x + (b.x - a.x) * eased,
+      y: a.y + (b.y - a.y) * eased,
+      z: a.z + (b.z - a.z) * eased,
+    };
+  }
+
+  _accentRgba(hex, a) {
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  render(ctx, canvas) {
+    const W = canvas.width, H = canvas.height;
+    const t = this.game.animTimer, glow = this.game.titleGlow;
+    const ex = this.game.explore;
+    const smooth = ScrollFlightManager.smooth, clamp = ScrollFlightManager.clamp;
+
+    // Void backdrop behind/around the grounds
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bgGrad.addColorStop(0, '#050010');
+    bgGrad.addColorStop(1, '#02000a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // ── The world, seen through the flight camera ──
+    const cam = this.cameraAt(this.scrollCur);
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(cam.z, cam.z);
+    ctx.translate(-cam.x, -cam.y);
+    ex._renderFloor(ctx, W, H);
+    ex._renderWardCircle(ctx, W, H, t, glow);
+    ex._renderStructures(ctx, W, H, glow);
+    ex._renderEncounterZones(ctx, t, glow);
+    ex._renderWardStone(ctx, t, glow); // also draws chests + the Star Sigil
+    ex._renderNPCs(ctx, t, glow);
+    ctx.restore();
+
+    // Screen-space vignette
+    const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.32, W / 2, H / 2, H * 0.85);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.62)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+
+    // Cinematic letterbox
+    ctx.fillStyle = 'rgba(2,0,8,0.92)';
+    ctx.fillRect(0, 0, W, 46);
+    ctx.fillRect(0, H - 46, W, 46);
+
+    const N = this.sections.length;
+    const u = this.scrollCur;
+    const activeSection = this.sectionAt(u);
+    const accent = this.sections[activeSection].accent;
+
+    // ── Pinned copy (opacity curves ported from scroll-world) ──
+    this.sections.forEach((s, i) => {
+      const pr = clamp((u - s.start) / (s.end - s.start));
+      const before = u < s.start, after = u > s.end;
+      let cop;
+      if (i === 0) cop = after ? 0 : smooth(1 - pr / 0.62);            // greets on landing
+      else if (i === N - 1) cop = before ? 0 : smooth(pr / 0.4);       // holds at the end
+      else cop = (before || after) ? 0 : smooth(1 - Math.abs(pr - 0.5) / 0.5);
+      if (cop <= 0.01) return;
+
+      // Left scrim so copy reads over the world (600px: the widest title,
+      // "One stone holds the balance." at bold 30px Cinzel, ends at x≈546)
+      const scrim = ctx.createLinearGradient(0, 0, 600, 0);
+      scrim.addColorStop(0, `rgba(3,0,12,${0.72 * cop})`);
+      scrim.addColorStop(0.6, `rgba(3,0,12,${0.38 * cop})`);
+      scrim.addColorStop(1, 'rgba(3,0,12,0)');
+      ctx.fillStyle = scrim;
+      ctx.fillRect(0, 46, 600, H - 92);
+
+      const cx2 = 56;
+      const cy2 = H * 0.5 + (0.5 - pr) * 26;
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = cop;
+      ctx.fillStyle = 'rgba(170,140,210,0.85)';
+      ctx.font = '10px monospace';
+      ctx.fillText(`0${i + 1} / 0${N}`, cx2, cy2 - 78);
+      ctx.fillStyle = s.accent;
+      ctx.font = 'bold 12px Cinzel, serif';
+      ctx.fillText(s.eyebrow.split('').join(' '), cx2, cy2 - 54);
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = this._accentRgba(s.accent, 0.45);
+      ctx.shadowBlur = 18;
+      ctx.font = 'bold 30px Cinzel, Georgia, serif';
+      ctx.fillText(s.title, cx2, cy2 - 20);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(216,198,240,0.92)';
+      ctx.font = '14px Georgia, serif';
+      wrapText(ctx, s.body, cx2, cy2 + 8, 350, 20);
+      ctx.globalAlpha = 1;
+    });
+
+    // ── Route rail (right edge) ──
+    this.dotRects = [];
+    const railX = W - 34;
+    const railTop = H / 2 - ((N - 1) * 26) / 2;
+    ctx.strokeStyle = this._accentRgba(accent, 0.28);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(railX, railTop - 8);
+    ctx.lineTo(railX, railTop + (N - 1) * 26 + 8);
+    ctx.stroke();
+    this.sections.forEach((s, i) => {
+      const dy = railTop + i * 26;
+      const isActive = i === activeSection;
+      ctx.fillStyle = isActive ? s.accent : this._accentRgba(s.accent, 0.35);
+      ctx.beginPath();
+      ctx.arc(railX, dy, isActive ? 6 : 4, 0, Math.PI * 2);
+      ctx.fill();
+      if (isActive) {
+        ctx.strokeStyle = this._accentRgba(s.accent, 0.35);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(railX, dy, 10, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(230,215,255,0.9)';
+        ctx.font = 'bold 10px Cinzel, serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(s.label, railX - 16, dy + 3);
+      }
+      this.dotRects.push({ x: railX - 14, y: dy - 14, w: 28, h: 28 });
+    });
+
+    // ── Progress bar (top edge) ──
+    ctx.fillStyle = this._accentRgba(accent, 0.18);
+    ctx.fillRect(0, 0, W, 3);
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, 0, W * clamp(u / this.totalW), 3);
+
+    // ── Scroll hint (fades once the flight starts) ──
+    const hintOp = clamp(1 - u / 0.5);
+    if (hintOp > 0.01 && !this.finishing) {
+      ctx.globalAlpha = hintOp;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(200,170,255,0.85)';
+      ctx.font = '11px monospace';
+      ctx.fillText(this.isTouch ? 'DRAG TO FLY' : 'SCROLL TO FLY IN', W / 2, H - 60);
+      if (!this.isTouch) {
+        // little mouse-wheel glyph with a travelling dot
+        const mx = W / 2, my = H - 96;
+        ctx.strokeStyle = 'rgba(200,170,255,0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(mx - 9, my - 14, 18, 28, 9);
+        ctx.stroke();
+        const dotT = (t % 1.7) / 1.7;
+        ctx.globalAlpha = hintOp * Math.sin(dotT * Math.PI);
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.arc(mx, my - 7 + dotT * 11, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // ── End CTA ──
+    if (this.atEnd() && !this.finishing) {
+      const pulse = 0.65 + Math.sin(t * 3) * 0.35;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(240,208,128,${pulse})`;
+      ctx.font = 'bold 16px Cinzel, serif';
+      ctx.fillText(this.isTouch ? '✦  TAP TO BEGIN THE TRIAL  ✦' : '✦  ENTER — BEGIN THE TRIAL  ✦', W / 2, H - 62);
+    }
+
+    // ── Skip button (bottom right) ──
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(150,110,200,0.55)';
+    ctx.font = '10px monospace';
+    const skipLabel = this.isTouch ? '✕ SKIP' : 'ESC — SKIP PROLOGUE';
+    ctx.fillText(skipLabel, W - 16, H - 18);
+    this.skipRect = { x: W - 176, y: H - 40, w: 168, h: 32 };
+
+    // ── Fades ──
+    if (this.fadeIn > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${this.fadeIn})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (this.fadeOut > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${Math.min(1, this.fadeOut)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+}
+
 class ExploreManager {
   constructor(game) {
     this.game = game;
@@ -4045,6 +4412,10 @@ function setupClickHandler(game, canvas) {
       game.dialogue?.advance();
     }
 
+    if (game.state === STATE.PROLOGUE && game.prologue) {
+      game.prologue.onClick(cx, cy);
+    }
+
     if (game.state === STATE.BATTLE && game.battle) {
       const ph = game.battle.phase;
       if (ph === 'PLAYER_TURN' && !game.battle.subMenu) {
@@ -4095,6 +4466,49 @@ function setupClickHandler(game, canvas) {
       // Touch/click to move (optional)
     }
   });
+}
+
+// ─── Prologue scrub input (wheel + touch drag) ───────────────
+// Scroll is the prologue's scrubber: wheel and touch-drag deltas drive the
+// flight camera (scroll-world technique — scroll only drives time).
+function setupPrologueScrollInput(game, canvas) {
+  canvas.addEventListener('wheel', (e) => {
+    if (game.state !== STATE.PROLOGUE || !game.prologue) return;
+    e.preventDefault();
+    // Normalize deltaMode: line-mode (1) and page-mode (2) wheels report tiny
+    // deltas that would make the scrub feel frozen without conversion.
+    const px = e.deltaMode === 1 ? e.deltaY * 33
+             : e.deltaMode === 2 ? e.deltaY * canvas.height
+             : e.deltaY;
+    game.prologue.onWheel(px);
+  }, { passive: false });
+
+  // Track the scrubbing finger by identifier — e.touches[0] is the first
+  // touch anywhere on the page (e.g. a thumb resting on the D-pad overlay),
+  // not necessarily the finger dragging the canvas.
+  let scrubTouchId = null, lastTouchY = null;
+  canvas.addEventListener('touchstart', (e) => {
+    if (game.state !== STATE.PROLOGUE || scrubTouchId !== null) return;
+    const t = e.changedTouches[0];
+    scrubTouchId = t.identifier;
+    lastTouchY = t.clientY;
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => {
+    if (game.state !== STATE.PROLOGUE || !game.prologue || scrubTouchId === null) return;
+    let t = null;
+    for (const ct of e.changedTouches) if (ct.identifier === scrubTouchId) { t = ct; break; }
+    if (!t) return;
+    e.preventDefault();
+    game.prologue.onDrag(lastTouchY - t.clientY); // drag up = fly forward
+    lastTouchY = t.clientY;
+  }, { passive: false });
+  const endScrub = (e) => {
+    for (const ct of e.changedTouches) {
+      if (ct.identifier === scrubTouchId) { scrubTouchId = null; lastTouchY = null; }
+    }
+  };
+  canvas.addEventListener('touchend', endScrub, { passive: true });
+  canvas.addEventListener('touchcancel', endScrub, { passive: true });
 }
 
 // ─── Touch controls (mobile) ─────────────────────────────────
@@ -4165,6 +4579,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const game = window.game = new WardedOnesGame();
   setupClickHandler(game, canvas);
   setupTouchControls(game);
+  setupPrologueScrollInput(game, canvas);
 
   // Loading screen
   const ctx = canvas.getContext('2d');

@@ -27,6 +27,9 @@ company of six and answer what prowls between the stars.
 
 ### Features (v0.2)
 - ✦ Branded title screen with animated effects
+- ✦ Scroll-scrubbed prologue cinematic — scrolling flies the camera over the
+  Warded Grounds through five story beats before the trial begins (scrub
+  technique adapted from [scroll-world](https://github.com/oso95/scroll-world), MIT)
 - ✦ Intro cutscene with progressive dialogue
 - ✦ Explorable area with NPCs, chests, and interactive objects
 - ✦ Turn-based combat with Attack / Ability / Item / Defend

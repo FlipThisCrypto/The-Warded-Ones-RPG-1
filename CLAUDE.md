@@ -94,6 +94,11 @@ git push origin main
 - Audio settings persist (warded_ones_settings_v1); saves persist chest/
   sigil object state
 - Automated playthrough protocol + latest results: PLAYTEST.md
+- Scroll-scrubbed prologue (STATE.PROLOGUE, ScrollFlightManager): new game
+  opens with a scroll-driven camera flight over the live-rendered map —
+  wheel/touch-drag/W-S scrub, 5 story sections, route rail, ESC skips.
+  Scrub math adapted from github.com/oso95/scroll-world (MIT, attributed
+  in the class header)
 
 ## Known Issues (v0.2)
 - Browser screenshot tool timeout in embedded panes (RAF throttling —
