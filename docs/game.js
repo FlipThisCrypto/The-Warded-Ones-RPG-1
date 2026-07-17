@@ -3387,6 +3387,7 @@ class BattleManager {
     this.pendingAction = null;
     this.rewards = null;
     this.levelUps = [];
+    this.enemyIntent = null;       // telegraphed enemy move during the wind-up
 
     // ── Visual FX ─────────────────────────────────────────────
     this.floatingTexts = [];       // damage/heal numbers that drift up
@@ -3422,6 +3423,7 @@ class BattleManager {
   }
 
   advanceToNextTurn() {
+    this.enemyIntent = null; // clear any stale telegraph
     // Skip dead combatants (reads LIVE hp now, so KO'd units never act)
     let loops = 0;
     while (loops < 20) {
@@ -3500,15 +3502,36 @@ class BattleManager {
   }
 
   scheduleEnemyAction(enemy) {
+    // Decide the move NOW and telegraph it during the wind-up, so Defend and
+    // Ward Shards become informed decisions. null = the enemy will guard.
+    const abilityId = this.chooseEnemyAbility(enemy);
+    const def = abilityId ? this.game.getAbilityDef(abilityId) : null;
+    this.enemyIntent = {
+      id: enemy.id || enemy.name,
+      label: abilityId === null ? 'Guard' : (def?.name || 'Attack'),
+      type: def?.type || 'guard',
+    };
     setTimeout(() => {
       if (this.phase !== 'ENEMY_TURN') return;
-      this.executeEnemyAction(enemy);
-    }, 1200);
+      this.executeEnemyAction(enemy, abilityId);
+    }, 1700); // longer than before so the telegraph is readable
   }
 
-  executeEnemyAction(enemy) {
+  executeEnemyAction(enemy, plannedAbility) {
+    this.enemyIntent = null; // wind-up is over
     const alive = this.party.filter(m => m.currentHp > 0);
     if (!alive.length) { this.checkBattleEnd(); return; }
+
+    // Defensive archetype chose to brace instead of attack.
+    if (plannedAbility === null) {
+      enemy.defending = true;
+      this.addLog(`${enemy.name} braces defensively!`);
+      const pos = this._combatantPos(enemy);
+      this.spawnFloat(pos.x, pos.y - 30, 'GUARD', '#60d0ff');
+      this.checkBattleEnd();
+      setTimeout(() => { this.currentTurn++; this.advanceToNextTurn(); }, 600);
+      return;
+    }
 
     // Confusion (Shuffle): the enemy may flail and strike itself instead.
     if (enemy.statusEffects?.some(se => se.type === 'confuse') && Math.random() < 0.4) {
@@ -3519,13 +3542,14 @@ class BattleManager {
       return;
     }
 
-    const ability = this.chooseEnemyAbility(enemy);
-    // AoE abilities (target: all_enemies) hit the whole living party;
-    // everything else picks one random living member.
+    const ability = plannedAbility;
     const abilityDef = this.game.getAbilityDef(ability);
-    const targets = abilityDef && abilityDef.target === 'all_enemies'
-      ? alive
-      : [alive[Math.floor(Math.random() * alive.length)]];
+    // AoE hits the whole living party; aggressive enemies single out the
+    // weakest target (so the telegraph is actionable); others pick at random.
+    let targets;
+    if (abilityDef && abilityDef.target === 'all_enemies') targets = alive;
+    else if ((enemy.ai || 'balanced') === 'aggressive') targets = [alive.reduce((lo, m) => m.currentHp < lo.currentHp ? m : lo, alive[0])];
+    else targets = [alive[Math.floor(Math.random() * alive.length)]];
 
     this.executeAbility(enemy, targets, ability, false);
     this.checkBattleEnd();
@@ -3538,14 +3562,33 @@ class BattleManager {
 
   chooseEnemyAbility(enemy) {
     const ai = enemy.ai || 'balanced';
-    const abilities = enemy.abilities || ['claw_swipe'];
-    // Simple AI: aggressive prefers high-power, balanced is random, defensive heals if low HP
+    // Only consider abilities the enemy can actually afford (an MP-starved
+    // enemy used to silently waste its turn); claw_swipe is the free fallback.
+    let abilities = (enemy.abilities || ['claw_swipe']).filter(a => {
+      const def = this.game.getAbilityDef(a);
+      return !def || (def.mp_cost || 0) <= enemy.currentMp;
+    });
+    if (!abilities.length) abilities = ['claw_swipe'];
+
+    // Defensive: guard (return null) when badly hurt.
+    if (ai === 'defensive' && enemy.currentHp < enemy.stats.hp * 0.4 && Math.random() < 0.6) {
+      return null;
+    }
+    // Aggressive: favour heavy hits.
     if (ai === 'aggressive' && Math.random() < 0.4) {
       const heavy = abilities.filter(a => {
         const def = this.game.getAbilityDef(a);
         return def && (def.power || 0) > 1.2;
       });
       if (heavy.length) return heavy[Math.floor(Math.random() * heavy.length)];
+    }
+    // Swift: favour multi-hit flurries.
+    if (ai === 'swift' && Math.random() < 0.6) {
+      const multi = abilities.filter(a => {
+        const def = this.game.getAbilityDef(a);
+        return def && (def.hits || 1) > 1;
+      });
+      if (multi.length) return multi[Math.floor(Math.random() * multi.length)];
     }
     return abilities[Math.floor(Math.random() * abilities.length)];
   }
@@ -4725,18 +4768,37 @@ class BattleManager {
       });
     }
 
-    // Enemy turn indicator — animated pulse
+    // Enemy turn indicator — telegraphs the wound-up move when known
     if (this.phase === 'ENEMY_TURN') {
       const pulse = 0.5 + Math.sin(this.animTimer * 8) * 0.2;
+      const intent = this.enemyIntent;
+      const actor = intent && this.enemies.find(e => (e.id || e.name) === intent.id);
       ctx.fillStyle = `rgba(0,0,0,${pulse * 0.6})`;
       ctx.fillRect(0, H * 0.42, W, 36);
-      ctx.fillStyle = '#ff8080';
-      ctx.font = 'bold 18px Cinzel, serif';
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(255,80,80,0.5)';
       ctx.shadowBlur = 10;
-      ctx.fillText('Enemy Turn...', W/2, H * 0.42 + 24);
-      ctx.shadowBlur = 0;
+      if (intent && actor) {
+        const guard = intent.type === 'guard';
+        ctx.fillStyle = guard ? '#80d0ff' : '#ffcf70';
+        ctx.shadowColor = guard ? 'rgba(100,180,255,0.5)' : 'rgba(255,180,80,0.5)';
+        ctx.font = 'bold 17px Cinzel, serif';
+        ctx.fillText(guard ? `${actor.name} braces to guard…` : `${actor.name} prepares ${intent.label}!`, W/2, H * 0.42 + 24);
+        ctx.shadowBlur = 0;
+        // Pulsing "!" above the acting enemy
+        const pos = this.enemyPositions.find(p => p.id === intent.id);
+        if (pos && !guard) {
+          const bob = Math.sin(this.animTimer * 8) * 4;
+          ctx.fillStyle = `rgba(255,210,90,${0.6 + pulse * 0.4})`;
+          ctx.font = 'bold 28px Georgia';
+          ctx.fillText('!', pos.x, pos.y - 90 + bob);
+        }
+      } else {
+        ctx.fillStyle = '#ff8080';
+        ctx.shadowColor = 'rgba(255,80,80,0.5)';
+        ctx.font = 'bold 18px Cinzel, serif';
+        ctx.fillText('Enemy Turn...', W/2, H * 0.42 + 24);
+        ctx.shadowBlur = 0;
+      }
     }
 
     // ── FX layer (drawn last, above everything) ──────────────
