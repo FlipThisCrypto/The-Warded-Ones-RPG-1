@@ -94,6 +94,31 @@ git push origin main
 - Audio settings persist (warded_ones_settings_v1); saves persist chest/
   sigil object state
 - Automated playthrough protocol + latest results: PLAYTEST.md
+- Combat depth (loop 4): status effects are mechanically real — buildTurnOrder
+  holds LIVE combatant refs (tagged isPlayer), advanceToNextTurn does
+  start-of-turn upkeep for both sides (clear Defend, tick DoT/expiry,
+  freeze=skip-turn). atk_down cuts damage 0.7x (damage-time multiplier, never
+  mutates the JSON-shared stats), confuse (Shuffle) gives 40% self-hit. LCK
+  drives crits (5%+1%/LCK, 1.7x, gold flash + CRITICAL! + sting). Per-element
+  hit VFX (ELEMENT_FX/abilityElement → spawnImpactBurst) + element-tinted
+  numbers. Enemy intent telegraphs (scheduleEnemyAction stores enemyIntent,
+  1700ms wind-up) + AI archetypes (defensive guards <40% HP, swift favours
+  multi-hit, aggressive targets weakest); chooseEnemyAbility filters affordable.
+- Post-quest respawning hunts (ExploreManager.spawnHunts) use the otherwise-
+  idle azure_tiger + arctic_lion once trial_of_wards completes; onBattleWin(zone)
+  branches on zone.hunt (no quest progress, 12s cooldown, re-arm after player
+  leaves); huntsSpawned persisted.
+- Progression is legible: levelUp() returns stat gains; victory + quest-complete
+  show a +HP/+MP/… breakdown (boxes grow); EXP bars in the explore party panel
+  and victory screen.
+- Boss music: playBattleMusic(isBoss) — blaze_lion has "boss":true (lower/denser/
+  phrygian); checkBattleEnd stopMusic() before the jingle. Ambient explore:
+  drifting ward motes (scatter from player) + footstep dust.
+- Iris battle transition (WardedOnesGame.battleTransition): ward-ring iris wipe
+  replaces the hard cut; triggerBattle routes through startBattleTransition;
+  battle created at the midpoint (its fadeIn skipped); startNewGame/load clear it.
+  NOTE: the Ward Stone Blaze Lion and Astral Cougar fights start via interact()'s
+  direct startBattle (they have dialogue intros), so they do NOT play the iris.
 - Scroll-scrubbed cinematics (STATE.PROLOGUE, ScrollFlightManager): new game
   opens with a scroll-driven camera flight over the live-rendered map —
   wheel/touch-drag/W-S scrub, 5 story sections, route rail, ESC skips.

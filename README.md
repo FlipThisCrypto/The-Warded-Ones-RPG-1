@@ -36,15 +36,20 @@ company of six and answer what prowls between the stars.
   [scroll-world](https://github.com/oso95/scroll-world), MIT)
 - ✦ Intro cutscene with progressive dialogue
 - ✦ Explorable area with NPCs, chests, and interactive objects
-- ✦ Turn-based combat with Attack / Ability / Item / Defend
+- ✦ Turn-based combat with Attack / Ability / Item / Defend, per-element hit
+  effects, LCK-driven critical hits, and an iris battle-transition wipe
+- ✦ Tactical status effects that actually bite — burn/poison tick, freeze
+  skips a turn, ATK-down and confusion swing fights
+- ✦ Enemy intent telegraphs + distinct AI (defensive guards, swift flurries,
+  aggressive singles out the weakest) — Defend becomes a real decision
 - ✦ Six playable Jesters — three starters plus three recruitable in the world
   (Verity Vex, Cogsworth, Sir Paradox)
-- ✦ Two chained story quests, boss fights, and a quest journal (J)
-- ✦ Enemy abilities, AI behavior, and party-wide boss AoEs
-- ✦ Status effects (burn, freeze, confuse, ATK/SPD down, evade)
-- ✦ EXP, leveling, and gold rewards
+- ✦ Two chained story quests, a distinct boss theme, and a quest journal (J)
+- ✦ Post-quest respawning hunts for extra battles and EXP
+- ✦ EXP bars + a level-up fanfare showing every stat gain
+- ✦ Living exploration — drifting ward-motes and footstep dust
 - ✦ Defeat screen with Retry Battle / Wake options
-- ✦ Save / Load via browser localStorage (settings persist too)
+- ✦ Save / Load via browser localStorage, with an overwrite guard on New Game
 - ✦ Keyboard, mouse/click, and mobile touch controls
 
 ---
