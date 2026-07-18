@@ -54,6 +54,9 @@ fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
 | Narrow viewport horizontal overflow | ✅ fixed at 390×844 |
 | Grounds chest rewards | ✅ valid Healing Potion / Full Restore IDs |
 | Defeat Retry / Wake | ✅ pre-battle restore and exploration revival covered |
+| Real-delta simulation / paused movement | ✅ rendering no longer mutates gameplay |
+| Recruit + Astral Cougar portrait preload | ✅ derived from character/enemy data |
+| Reduced-motion performance path | ✅ fewer motes/particles and no battle shake |
 
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 

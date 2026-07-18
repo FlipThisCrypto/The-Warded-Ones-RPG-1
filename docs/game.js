@@ -36,6 +36,7 @@ class WardedOnesGame {
     this.gold = 0;
     this.playtime = 0;
     this.saveExists = false;
+    this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
     this.battle = null;
     this.dialogue = null;
@@ -78,22 +79,16 @@ class WardedOnesGame {
     this.data.dialogue = dialogue;
 
     // Preload images
-    const imageList = [
+    const imageList = [...new Set([
       'assets/ui/logo.png',
       'assets/ui/banner.png',
       'assets/ui/title_char.png',
-      'assets/characters/motley_max.png',
-      'assets/characters/gloam.png',
-      'assets/characters/tumbling_tess.png',
-      'assets/enemies/abyss_tiger.png',
-      'assets/enemies/arcane_leopard.png',
-      'assets/enemies/blaze_lion.png',
-      'assets/enemies/azure_tiger.png',
-      'assets/enemies/arctic_lion.png',
+      ...chars.map(c => c.portrait).filter(Boolean),
+      ...enemies.map(e => e.portrait).filter(Boolean),
       'assets/backgrounds/battle_bg.jpg',
       'assets/backgrounds/battle_bg2.jpg',
       'assets/backgrounds/battle_bg3.jpg',
-    ];
+    ])];
 
     this.totalImages = imageList.length;
     await this.preloadImages(imageList);
@@ -159,7 +154,15 @@ class WardedOnesGame {
   }
 
   update(dt) {
+    const gameplayStates = [STATE.PROLOGUE, STATE.CUTSCENE, STATE.EXPLORE, STATE.DIALOGUE,
+      STATE.BATTLE, STATE.VICTORY, STATE.DEFEAT, STATE.QUEST_COMPLETE];
+    if (gameplayStates.includes(this.state)) this.playtime += dt;
     if (this.state === STATE.TITLE) this.updateParticles(dt);
+    if (this.state === STATE.EXPLORE && this.explore) {
+      const canvas = document.getElementById('game-canvas');
+      if (canvas) this.explore.update(dt, canvas);
+    }
+    if ((this.state === STATE.DIALOGUE || this.state === STATE.CUTSCENE) && this.dialogue) this.dialogue.update(dt);
     if (this.state === STATE.BATTLE && this.battle) this.battle.update(dt);
     if (this.state === STATE.PROLOGUE && this.prologue) this.prologue.update(dt);
     if (this.battleTransition) this.updateBattleTransition(dt);
@@ -496,7 +499,8 @@ class WardedOnesGame {
   // ─── Particle System ──────────────────────────────────────
   updateParticles(dt) {
     // Spawn
-    if (this.particles.length < 60 && Math.random() < 0.3) {
+    const particleCap = this.reducedMotion ? 20 : 60;
+    if (this.particles.length < particleCap && Math.random() < (this.reducedMotion ? 0.12 : 0.3)) {
       const canvas = document.getElementById('game-canvas');
       this.particles.push({
         x: Math.random() * canvas.width,
@@ -1613,8 +1617,6 @@ class DialogueManager {
   }
 
   render(ctx, canvas) {
-    this.update(1/60);
-
     const W = canvas.width, H = canvas.height;
     const line = this.lines[this.index];
     if (!line || this.done) return;
@@ -2234,7 +2236,7 @@ class ExploreManager {
     // fixed positions needed, but a one-time spread at construction is fine).
     this.dust = [];
     this.dustTimer = 0;
-    this.motes = Array.from({ length: 18 }, () => ({
+    this.motes = Array.from({ length: this.game.reducedMotion ? 8 : 18 }, () => ({
       x: 32 + Math.random() * 836,
       y: 70 + Math.random() * 495,
       phase: Math.random() * 6.28,
@@ -2730,7 +2732,6 @@ class ExploreManager {
 
   render(ctx, canvas) {
     const W = canvas.width, H = canvas.height;
-    this.update(1/60, canvas);
     const t = this.game.animTimer;
     const glow = this.game.titleGlow;
 
@@ -3085,7 +3086,7 @@ class ExploreManager {
       if (zone.used) return;
 
       const pulse = 0.5 + Math.sin(t * 2.5) * 0.3;
-      const enemyDef = this.game.data.enemies.find(e => e.id === zone.enemy[0]);
+      const enemyDefs = zone.enemy.map(id => this.game.data.enemies.find(e => e.id === id)).filter(Boolean);
 
       // Cracked floor fissure — radiating lines from center
       ctx.save();
@@ -3116,25 +3117,27 @@ class ExploreManager {
       ctx.restore();
 
       // Enemy portrait (small, above zone)
-      if (enemyDef) {
-        const img = this.game.images[`assets/enemies/${zone.enemy[0]}.png`];
-        if (img) {
+      if (enemyDefs.length) {
+        const bob = Math.sin(t * 2) * 3;
+        enemyDefs.slice(0, 2).forEach((enemyDef, index) => {
+          const img = this.game.images[enemyDef.portrait];
+          if (!img) return;
           const s = 54;
-          const bob = Math.sin(t * 2) * 3;
+          const offset = (index - (Math.min(enemyDefs.length, 2) - 1) / 2) * 34;
           ctx.save();
           ctx.globalAlpha = 0.85;
           ctx.shadowColor = 'rgba(220,60,60,0.6)';
           ctx.shadowBlur = 12;
-          ctx.drawImage(img, zone.x - s/2, zone.y - s - 8 + bob, s, s);
+          ctx.drawImage(img, zone.x - s/2 + offset, zone.y - s - 8 + bob - index * 4, s, s);
           ctx.restore();
-          // Name tag
-          ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillRect(zone.x - 48, zone.y + 6, 96, 16);
-          ctx.fillStyle = `rgba(255,120,120,${0.7 + glow * 0.3})`;
-          ctx.font = 'bold 10px Georgia, serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(enemyDef.name, zone.x, zone.y + 17);
-        }
+        });
+        const label = enemyDefs.length > 1 ? 'Twin Guardians' : enemyDefs[0].name;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(zone.x - 56, zone.y + 6, 112, 16);
+        ctx.fillStyle = `rgba(255,120,120,${0.7 + glow * 0.3})`;
+        ctx.font = 'bold 10px Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, zone.x, zone.y + 17);
       }
     });
   }
@@ -4058,6 +4061,7 @@ class BattleManager {
   }
 
   spawnBattleParticles(x, y, color = '#ffbb33', count = 18) {
+    if (this.game.reducedMotion) count = Math.max(3, Math.ceil(count * 0.4));
     const colors = Array.isArray(color) ? color : [color, '#ffffff', '#ff6633'];
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -4098,8 +4102,9 @@ class BattleManager {
 
   spawnVictoryBurst(cx, cy) {
     const colors = ['#f0d060', '#d080ff', '#60e0ff', '#ff8060', '#80ff80'];
-    for (let i = 0; i < 60; i++) {
-      const angle = (Math.PI * 2 * i) / 60 + Math.random() * 0.2;
+    const count = this.game.reducedMotion ? 18 : 60;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.2;
       const speed = 80 + Math.random() * 200;
       this.victoryParticles.push({
         x: cx, y: cy,
@@ -4623,8 +4628,8 @@ class BattleManager {
     }
 
     // Screen shake — applied to the enemy area only (leaves UI stable)
-    const shakeOffX = this.shakeX > 0 ? (Math.random() - 0.5) * this.shakeX * 2 : 0;
-    const shakeOffY = this.shakeY > 0 ? (Math.random() - 0.5) * this.shakeY * 2 : 0;
+    const shakeOffX = !this.game.reducedMotion && this.shakeX > 0 ? (Math.random() - 0.5) * this.shakeX * 2 : 0;
+    const shakeOffY = !this.game.reducedMotion && this.shakeY > 0 ? (Math.random() - 0.5) * this.shakeY * 2 : 0;
 
     // Reset position tracking each frame
     this.enemyPositions = [];
@@ -5475,5 +5480,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   ctx.fillStyle = '#6030a0';
   ctx.fillText('Loading...', canvas.width/2, canvas.height/2 + 20);
 
-  await game.init();
+  try {
+    await game.init();
+  } catch (error) {
+    console.error('Game initialization failed:', error);
+    ctx.fillStyle = '#050010';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f08090';
+    ctx.font = "bold 24px 'Cinzel', Georgia, serif";
+    ctx.textAlign = 'center';
+    ctx.fillText('THE WARDS COULD NOT FORM', canvas.width / 2, canvas.height / 2 - 24);
+    ctx.fillStyle = '#d0b8e8';
+    ctx.font = '15px Georgia, serif';
+    ctx.fillText('Game data failed to load. Refresh the page to try again.', canvas.width / 2, canvas.height / 2 + 16);
+    ctx.fillStyle = '#806898';
+    ctx.font = '11px monospace';
+    ctx.fillText('If this continues, check your connection or clear the site cache.', canvas.width / 2, canvas.height / 2 + 44);
+  }
 });

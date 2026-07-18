@@ -34,6 +34,20 @@ game.quests = structuredClone(game.data.questDefs);
 game.explore = new ExploreManager(game);
 game.state = STATE.EXPLORE;
 
+// Simulation uses real update deltas and freezes exploration behind pause.
+const initialX = game.explore.playerX;
+game.input.keys.ArrowRight = true;
+game.update(0.1);
+assert.ok(game.explore.playerX > initialX);
+assert.equal(game.playtime, 0.1);
+game.state = STATE.PAUSE;
+const pausedX = game.explore.playerX;
+game.update(0.5);
+assert.equal(game.explore.playerX, pausedX);
+assert.equal(game.playtime, 0.1, 'paused time should not count as active playtime');
+game.input.keys.ArrowRight = false;
+game.state = STATE.EXPLORE;
+
 function drainDialogue() {
   let guard = 0;
   while (game.dialogue && !game.dialogue.done && guard++ < 30) {

@@ -94,6 +94,11 @@ git push origin main
 - Durable checks live in `tests/validate-data.mjs` and
   `tests/world-save.test.mjs`; `tests/full-flow.test.mjs` covers both chained
   quests and the complete two-map callback flow.
+- Simulation now advances from `WardedOnesGame.update(dt)`, not render calls:
+  exploration freezes behind overlays, dialogue uses real deltas, and playtime
+  is accurate. Runtime portraits preload from JSON data. Reduced-motion mode
+  trims particles/motes and removes battle shake; failed data loading renders a
+  visible recovery screen instead of hanging on Loading.
 - Six playable Jesters: 3 starters + 3 recruitable via map NPCs
   (`recruit: true` in characters.json; recruit NPCs in ExploreManager)
 - Two chained quests (quests.json `unlocks` field); quest journal on J

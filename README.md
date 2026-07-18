@@ -52,6 +52,8 @@ company of six and answer what prowls between the stars.
 - ✦ Defeat screen with Retry Battle / Wake options
 - ✦ Save / Load via browser localStorage, with an overwrite guard on New Game
 - ✦ Map-aware save migration preserves existing v0.2 saves and rejects invalid destinations
+- ✦ Data-driven portrait preloading, reduced-motion effects, accurate playtime,
+  and a visible recovery screen when game data cannot load
 - ✦ Keyboard, mouse/click, and mobile touch controls
 
 ---
