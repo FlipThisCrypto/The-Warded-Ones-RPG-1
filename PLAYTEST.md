@@ -35,10 +35,23 @@ interact range). Run it after any engine or content change.
 node --check docs/game.js
 node tests/validate-data.mjs
 node tests/world-save.test.mjs
+node tests/full-flow.test.mjs
 ```
 
 The world/save test covers schema-2 roundtrip, v1 migration, unknown-map
 fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
+
+## Results — 2026-07-17 (v0.3 multi-map regression loop)
+
+| Check | Result |
+|---|---|
+| Deterministic full-flow integration | ✅ both quests, recruits, bosses, hunts, Verge, return |
+| World/save assertions | ✅ 19 passed |
+| Data validation | ✅ 6 characters, 6 enemies, 37 abilities, 5 items, 2 quests, 18 dialogues |
+| Echoing Verge visual render | ✅ zero console errors |
+| Hunt ownership after loading/updating in Verge | ✅ fixed; hunts remain in Grounds |
+| Exploration HUD overlap / invalid HP-MP maxima | ✅ fixed |
+| Narrow viewport horizontal overflow | ✅ fixed at 390×844 |
 
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 

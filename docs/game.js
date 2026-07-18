@@ -1515,8 +1515,8 @@ class UI {
       const startY = canvas.height - 28 - panelH;
       party.forEach((m, i) => {
         const cx = 8, cy = startY + i * (cardH + cardGap);
-        const hpRatio = Math.max(0, Math.min(1, m.currentHp / m.maxHp));
-        const mpRatio = Math.max(0, Math.min(1, m.currentMp / m.maxMp));
+        const hpRatio = Math.max(0, Math.min(1, m.currentHp / m.stats.hp));
+        const mpRatio = Math.max(0, Math.min(1, m.currentMp / m.stats.mp));
         const isKO = m.currentHp <= 0;
         ctx.fillStyle = isKO ? 'rgba(40,0,0,0.7)' : 'rgba(0,0,0,0.62)';
         ctx.fillRect(cx, cy, cardW, cardH);
@@ -1545,7 +1545,7 @@ class UI {
         ctx.fillStyle = 'rgba(220,220,220,0.7)';
         ctx.font = '8px monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(`HP ${m.currentHp}/${m.maxHp}`, barX, cy + 32);
+        ctx.fillText(`HP ${m.currentHp}/${m.stats.hp}`, barX, cy + 32);
         // MP bar track + fill
         ctx.fillStyle = 'rgba(20,20,60,0.8)';
         ctx.fillRect(barX + 60, barY, barW - 60, 6);
@@ -1556,7 +1556,7 @@ class UI {
         // MP text
         ctx.fillStyle = 'rgba(140,180,240,0.7)';
         ctx.textAlign = 'right';
-        ctx.fillText(`MP ${m.currentMp}/${m.maxMp}`, cx + cardW - 5, cy + 32);
+        ctx.fillText(`MP ${m.currentMp}/${m.stats.mp}`, cx + cardW - 5, cy + 32);
       });
     }
 
@@ -2548,7 +2548,10 @@ class ExploreManager {
   spawnHunts() {
     if (this.huntsSpawned) return;
     this.huntsSpawned = true;
-    this.encounter_zones.push(
+    // Hunts belong to the Grounds even if the first post-quest update happens
+    // after loading or transitioning into another map.
+    const groundsZones = this.mapStates?.warded_grounds?.encounter_zones || this.encounter_zones;
+    groundsZones.push(
       { id: 'grounds_azure_hunt', x: 180, y: 300, r: 64, enemy: ['azure_tiger'], bg: 'battle_bg2', used: false, hunt: true, respawn: 12, cooldown: 0 },
       { id: 'grounds_arctic_hunt', x: 720, y: 300, r: 64, enemy: ['arctic_lion'], bg: 'battle_bg',  used: false, hunt: true, respawn: 12, cooldown: 0 },
     );
@@ -2773,7 +2776,6 @@ class ExploreManager {
 
     // ── Layer 10: HUD ────────────────────────────────────────
     this.game.ui.renderHUD(ctx, canvas);
-    this.renderPartyStatus(ctx, canvas);
     this._renderMinimap(ctx, canvas);
     this._renderLocationCard(ctx, canvas);
   }
@@ -2803,7 +2805,6 @@ class ExploreManager {
     this._renderHints(ctx);
     this._renderAtmosphere(ctx, W, H, t, glow);
     this.game.ui.renderHUD(ctx, canvas);
-    this.renderPartyStatus(ctx, canvas);
     this._renderMinimap(ctx, canvas);
     this._renderLocationCard(ctx, canvas);
   }
@@ -2812,16 +2813,17 @@ class ExploreManager {
     if (!this.locationCard || this.locationCard.timer <= 0) return;
     const a = Math.min(1, this.locationCard.timer) * Math.min(1, (3 - this.locationCard.timer) * 2);
     ctx.save(); ctx.globalAlpha = Math.max(0, a);
-    ctx.fillStyle = 'rgba(2,5,14,0.78)'; ctx.fillRect(canvas.width / 2 - 190, 18, 380, 48);
-    ctx.strokeStyle = 'rgba(120,210,255,0.65)'; ctx.strokeRect(canvas.width / 2 - 190, 18, 380, 48);
+    const cardY = Math.floor(canvas.height * 0.28);
+    ctx.fillStyle = 'rgba(2,5,14,0.78)'; ctx.fillRect(canvas.width / 2 - 190, cardY, 380, 48);
+    ctx.strokeStyle = 'rgba(120,210,255,0.65)'; ctx.strokeRect(canvas.width / 2 - 190, cardY, 380, 48);
     ctx.fillStyle = '#d8f6ff'; ctx.font = "bold 18px 'Cinzel', serif"; ctx.textAlign = 'center';
-    ctx.fillText(this.locationCard.text, canvas.width / 2, 49); ctx.restore();
+    ctx.fillText(this.locationCard.text, canvas.width / 2, cardY + 31); ctx.restore();
   }
 
   _renderMinimap(ctx, canvas) {
     const W = canvas.width, H = canvas.height;
     const mmW = 110, mmH = 80;
-    const mmX = 24, mmY = H - mmH - 24;
+    const mmX = (W - mmW) / 2, mmY = H - mmH - 24;
 
     // Outer frame with dark purple theme and cyan glow border
     drawRoundedRect(ctx, mmX, mmY, mmW, mmH, 8, 'rgba(8, 4, 24, 0.85)', 'rgba(0, 240, 255, 0.4)', 1.5);

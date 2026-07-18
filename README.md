@@ -109,6 +109,7 @@ Validation:
 node --check docs/game.js
 node tests/validate-data.mjs
 node tests/world-save.test.mjs
+node tests/full-flow.test.mjs
 ```
 
 ---

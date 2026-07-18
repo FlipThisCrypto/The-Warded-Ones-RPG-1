@@ -92,7 +92,8 @@ git push origin main
 - Legacy saves default to Warded Grounds, invalid coordinates/map IDs are
   clamped/fallback safely, and mid-quest saves recreate the dynamic Blaze Lion.
 - Durable checks live in `tests/validate-data.mjs` and
-  `tests/world-save.test.mjs`.
+  `tests/world-save.test.mjs`; `tests/full-flow.test.mjs` covers both chained
+  quests and the complete two-map callback flow.
 - Six playable Jesters: 3 starters + 3 recruitable via map NPCs
   (`recruit: true` in characters.json; recruit NPCs in ExploreManager)
 - Two chained quests (quests.json `unlocks` field); quest journal on J
