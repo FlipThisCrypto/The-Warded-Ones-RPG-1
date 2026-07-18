@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const storage = new Map();
+let storageFails = false;
 const noop = () => {};
 const context = vm.createContext({
   console,
@@ -14,7 +15,11 @@ const context = vm.createContext({
   setTimeout,
   clearTimeout,
   requestAnimationFrame: noop,
-  localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
+  localStorage: {
+    getItem: key => { if (storageFails) throw new Error('storage denied'); return storage.get(key) ?? null; },
+    setItem: (key, value) => { if (storageFails) throw new Error('quota exceeded'); storage.set(key, value); },
+    removeItem: key => storage.delete(key),
+  },
   window: { addEventListener: noop, AudioContext: class {}, webkitAudioContext: class {} },
   document: { addEventListener: noop, getElementById: () => null, body: { classList: { add: noop } } },
   navigator: { maxTouchPoints: 0 },
@@ -82,4 +87,10 @@ assert.equal(unknownMap.explore.currentMap, 'warded_grounds');
 
 storage.set('warded_ones_save_v1', '{broken');
 assert.equal(makeGame().load(), false);
-console.log('World/save tests passed: 15 assertions across map registry, roundtrip, legacy migration, boss restoration, unknown-map fallback, and corrupt JSON.');
+storageFails = true;
+const denied = makeGame();
+denied.explore = new ExploreManager(denied);
+assert.equal(denied.save(), false);
+assert.equal(denied.load(), false);
+storageFails = false;
+console.log('World/save tests passed: 17 assertions across map registry, roundtrip, legacy migration, boss restoration, unknown-map fallback, corrupt JSON, and unavailable storage.');

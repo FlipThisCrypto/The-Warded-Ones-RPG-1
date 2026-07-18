@@ -98,7 +98,9 @@ class WardedOnesGame {
     this.totalImages = imageList.length;
     await this.preloadImages(imageList);
 
-    const rawSave = localStorage.getItem(SAVE_KEY);
+    let rawSave = null;
+    try { rawSave = localStorage.getItem(SAVE_KEY); }
+    catch (e) { console.warn('Save storage unavailable:', e); }
     this.saveExists = !!rawSave;
     this.saveMeta = null;
     if (rawSave) {
@@ -616,13 +618,21 @@ class WardedOnesGame {
       quests: this.quests,
       exploreState: this.explore ? this.explore.getSaveData() : null,
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
-    this.saveExists = true;
-    return true;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+      this.saveExists = true;
+      return true;
+    } catch (e) {
+      console.error('Save failed:', e);
+      this.ui?.showNotification('Unable to save. Check browser storage permissions.');
+      return false;
+    }
   }
 
   load() {
-    const raw = localStorage.getItem(SAVE_KEY);
+    let raw;
+    try { raw = localStorage.getItem(SAVE_KEY); }
+    catch (e) { console.error('Save storage unavailable:', e); return false; }
     if (!raw) return false;
     try {
       const data = JSON.parse(raw);
@@ -934,7 +944,10 @@ class InputManager {
       }
       if (e.code === 'Enter' || e.code === 'KeyZ' || e.code === 'KeyF') {
         if (ui.pauseSelection === 0) { g.state = STATE.EXPLORE; }
-        if (ui.pauseSelection === 1) { g.save(); ui.showNotification('Game saved!'); g.state = STATE.EXPLORE; }
+        if (ui.pauseSelection === 1) {
+          if (g.save()) ui.showNotification('Game saved!');
+          g.state = STATE.EXPLORE;
+        }
         if (ui.pauseSelection === 2) { g.state = STATE.TITLE; g.audio.playExploreMusic(); }
       }
     }
