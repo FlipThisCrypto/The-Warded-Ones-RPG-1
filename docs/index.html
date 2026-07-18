@@ -40,6 +40,7 @@
       flex-direction: column;
       align-items: center;
       gap: 0;
+      max-width: 100vw;
     }
 
     #game-canvas {
@@ -66,6 +67,8 @@
       letter-spacing: 0.5px;
       width: 100%;
       justify-content: center;
+      max-width: 100vw;
+      flex-wrap: wrap;
     }
 
     #controls-bar span { display: flex; align-items: center; gap: 6px; }
@@ -81,7 +84,7 @@
 
     /* Prevent touch zoom on mobile */
     @media (max-width: 600px) {
-      #controls-bar { font-size: 9px; gap: 10px; padding: 4px 8px; }
+      #controls-bar { font-size: 9px; gap: 4px 10px; padding: 4px 8px; }
       .key { padding: 1px 3px; font-size: 9px; }
     }
 

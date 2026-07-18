@@ -190,6 +190,10 @@ Side quests
  Puzzle quests
 Phase 9 — Maps
 
+ [x] Multi-map foundation with stable map IDs and per-map persistence
+ [x] The Echoing Verge playable area, travel gate, return path, discovery, cache, and encounter
+ [ ] Full browser playthrough of the two-map v0.3 route on desktop and touch viewport
+
 Every map
 
  Concept

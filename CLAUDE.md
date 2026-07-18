@@ -3,10 +3,9 @@
 This file teaches future Claude Code sessions how to work safely in this repository.
 
 ## The One Thing (Current)
-The game is live on GitHub Pages with two complete quests, six playable
-Jesters, and mobile support. The next priority is: **a second explorable
-map** (the single Warded Grounds screen is now fully used) — then begin
-Godot 4 port planning.
+The game has two complete quests, six playable Jesters, mobile support, and
+a second explorable map. The next priority is: **complete a real full browser
+playthrough of the v0.3 two-map route and tune/fix anything it reveals**.
 
 ## Project Overview
 Browser-based RPG vertical slice built with vanilla HTML5 Canvas/JavaScript. Hosted on GitHub Pages from `/docs`.
@@ -83,7 +82,23 @@ git push origin main
 - Do not add blockchain, NFT minting, or online features to the game
 - Finish complete slices before expanding
 
-## Current State (v0.2 — after loop 3)
+## Current State (v0.3 — multi-map foundation)
+- The Echoing Verge unlocks at the south gate after `trial_of_wards`, returns
+  through its north arch, and contains a Ward Echo guide, Resonant Marker
+  discovery, cache, and a two-guardian encounter.
+- `ExploreManager.mapStates` owns map-specific NPC/object/encounter state;
+  `currentMap` and stable IDs serialize under save schema 2 while the existing
+  `warded_ones_save_v1` storage key remains compatible.
+- Legacy saves default to Warded Grounds, invalid coordinates/map IDs are
+  clamped/fallback safely, and mid-quest saves recreate the dynamic Blaze Lion.
+- Durable checks live in `tests/validate-data.mjs` and
+  `tests/world-save.test.mjs`; `tests/full-flow.test.mjs` covers both chained
+  quests and the complete two-map callback flow.
+- Simulation now advances from `WardedOnesGame.update(dt)`, not render calls:
+  exploration freezes behind overlays, dialogue uses real deltas, and playtime
+  is accurate. Runtime portraits preload from JSON data. Reduced-motion mode
+  trims particles/motes and removes battle shake; failed data loading renders a
+  visible recovery screen instead of hanging on Loading.
 - Six playable Jesters: 3 starters + 3 recruitable via map NPCs
   (`recruit: true` in characters.json; recruit NPCs in ExploreManager)
 - Two chained quests (quests.json `unlocks` field); quest journal on J
@@ -139,8 +154,8 @@ git push origin main
 ## Known Issues (v0.2)
 - Browser screenshot tool timeout in embedded panes (RAF throttling —
   drive `game.update(1/60)` manually when testing; see PLAYTEST.md)
-- Exploration area is a single hand-drawn screen — a second map is the
-  next expansion
+- The Echoing Verge is procedurally rendered; it has not yet received bespoke
+  runtime artwork.
 - Battle balance is untuned for levels beyond ~5
 
 ## Definition of Done

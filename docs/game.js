@@ -4,8 +4,9 @@
 'use strict';
 
 // ─── Constants ────────────────────────────────────────────────
-const GAME_VERSION = '0.2.0';
+const GAME_VERSION = '0.3.0';
 const SAVE_KEY = 'warded_ones_save_v1';
+const SAVE_SCHEMA_VERSION = 2;
 
 // ─── Game State Machine ───────────────────────────────────────
 const STATE = {
@@ -35,6 +36,7 @@ class WardedOnesGame {
     this.gold = 0;
     this.playtime = 0;
     this.saveExists = false;
+    this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
     this.battle = null;
     this.dialogue = null;
@@ -77,27 +79,23 @@ class WardedOnesGame {
     this.data.dialogue = dialogue;
 
     // Preload images
-    const imageList = [
+    const imageList = [...new Set([
       'assets/ui/logo.png',
       'assets/ui/banner.png',
       'assets/ui/title_char.png',
-      'assets/characters/motley_max.png',
-      'assets/characters/gloam.png',
-      'assets/characters/tumbling_tess.png',
-      'assets/enemies/abyss_tiger.png',
-      'assets/enemies/arcane_leopard.png',
-      'assets/enemies/blaze_lion.png',
-      'assets/enemies/azure_tiger.png',
-      'assets/enemies/arctic_lion.png',
+      ...chars.map(c => c.portrait).filter(Boolean),
+      ...enemies.map(e => e.portrait).filter(Boolean),
       'assets/backgrounds/battle_bg.jpg',
       'assets/backgrounds/battle_bg2.jpg',
       'assets/backgrounds/battle_bg3.jpg',
-    ];
+    ])];
 
     this.totalImages = imageList.length;
     await this.preloadImages(imageList);
 
-    const rawSave = localStorage.getItem(SAVE_KEY);
+    let rawSave = null;
+    try { rawSave = localStorage.getItem(SAVE_KEY); }
+    catch (e) { console.warn('Save storage unavailable:', e); }
     this.saveExists = !!rawSave;
     this.saveMeta = null;
     if (rawSave) {
@@ -156,7 +154,15 @@ class WardedOnesGame {
   }
 
   update(dt) {
+    const gameplayStates = [STATE.PROLOGUE, STATE.CUTSCENE, STATE.EXPLORE, STATE.DIALOGUE,
+      STATE.BATTLE, STATE.VICTORY, STATE.DEFEAT, STATE.QUEST_COMPLETE];
+    if (gameplayStates.includes(this.state)) this.playtime += dt;
     if (this.state === STATE.TITLE) this.updateParticles(dt);
+    if (this.state === STATE.EXPLORE && this.explore) {
+      const canvas = document.getElementById('game-canvas');
+      if (canvas) this.explore.update(dt, canvas);
+    }
+    if ((this.state === STATE.DIALOGUE || this.state === STATE.CUTSCENE) && this.dialogue) this.dialogue.update(dt);
     if (this.state === STATE.BATTLE && this.battle) this.battle.update(dt);
     if (this.state === STATE.PROLOGUE && this.prologue) this.prologue.update(dt);
     if (this.battleTransition) this.updateBattleTransition(dt);
@@ -493,7 +499,8 @@ class WardedOnesGame {
   // ─── Particle System ──────────────────────────────────────
   updateParticles(dt) {
     // Spawn
-    if (this.particles.length < 60 && Math.random() < 0.3) {
+    const particleCap = this.reducedMotion ? 20 : 60;
+    if (this.particles.length < particleCap && Math.random() < (this.reducedMotion ? 0.12 : 0.3)) {
       const canvas = document.getElementById('game-canvas');
       this.particles.push({
         x: Math.random() * canvas.width,
@@ -598,6 +605,7 @@ class WardedOnesGame {
   // ─── Save / Load ─────────────────────────────────────────
   save() {
     const saveData = {
+      schemaVersion: SAVE_SCHEMA_VERSION,
       version: GAME_VERSION,
       timestamp: Date.now(),
       playtime: this.playtime,
@@ -614,13 +622,21 @@ class WardedOnesGame {
       quests: this.quests,
       exploreState: this.explore ? this.explore.getSaveData() : null,
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
-    this.saveExists = true;
-    return true;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+      this.saveExists = true;
+      return true;
+    } catch (e) {
+      console.error('Save failed:', e);
+      this.ui?.showNotification('Unable to save. Check browser storage permissions.');
+      return false;
+    }
   }
 
   load() {
-    const raw = localStorage.getItem(SAVE_KEY);
+    let raw;
+    try { raw = localStorage.getItem(SAVE_KEY); }
+    catch (e) { console.error('Save storage unavailable:', e); return false; }
     if (!raw) return false;
     try {
       const data = JSON.parse(raw);
@@ -631,15 +647,16 @@ class WardedOnesGame {
       this.inventory = data.inventory || [];
       this.quests = data.quests || JSON.parse(JSON.stringify(this.data.questDefs));
 
-      this.party = data.party.map(saved => {
+      const savedParty = Array.isArray(data.party) && data.party.length ? data.party : [{ id: 'motley_max' }];
+      this.party = savedParty.map(saved => {
         const def = this.data.characters.find(c => c.id === saved.id);
         if (!def) return null;
         const member = this.createPartyMember(def);
-        member.level = saved.level;
-        member.exp = saved.exp;
-        member.expToNext = saved.expToNext;
-        member.currentHp = saved.currentHp;
-        member.currentMp = saved.currentMp;
+        member.level = Math.max(1, Number(saved.level) || 1);
+        member.exp = Math.max(0, Number(saved.exp) || 0);
+        member.expToNext = Math.max(1, Number(saved.expToNext) || 100);
+        member.currentHp = Math.max(0, Math.min(member.stats.hp, Number(saved.currentHp) || member.stats.hp));
+        member.currentMp = Math.max(0, Math.min(member.stats.mp, Number(saved.currentMp) || member.stats.mp));
         return member;
       }).filter(Boolean);
 
@@ -931,7 +948,10 @@ class InputManager {
       }
       if (e.code === 'Enter' || e.code === 'KeyZ' || e.code === 'KeyF') {
         if (ui.pauseSelection === 0) { g.state = STATE.EXPLORE; }
-        if (ui.pauseSelection === 1) { g.save(); ui.showNotification('Game saved!'); g.state = STATE.EXPLORE; }
+        if (ui.pauseSelection === 1) {
+          if (g.save()) ui.showNotification('Game saved!');
+          g.state = STATE.EXPLORE;
+        }
         if (ui.pauseSelection === 2) { g.state = STATE.TITLE; g.audio.playExploreMusic(); }
       }
     }
@@ -1499,8 +1519,8 @@ class UI {
       const startY = canvas.height - 28 - panelH;
       party.forEach((m, i) => {
         const cx = 8, cy = startY + i * (cardH + cardGap);
-        const hpRatio = Math.max(0, Math.min(1, m.currentHp / m.maxHp));
-        const mpRatio = Math.max(0, Math.min(1, m.currentMp / m.maxMp));
+        const hpRatio = Math.max(0, Math.min(1, m.currentHp / m.stats.hp));
+        const mpRatio = Math.max(0, Math.min(1, m.currentMp / m.stats.mp));
         const isKO = m.currentHp <= 0;
         ctx.fillStyle = isKO ? 'rgba(40,0,0,0.7)' : 'rgba(0,0,0,0.62)';
         ctx.fillRect(cx, cy, cardW, cardH);
@@ -1529,7 +1549,7 @@ class UI {
         ctx.fillStyle = 'rgba(220,220,220,0.7)';
         ctx.font = '8px monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(`HP ${m.currentHp}/${m.maxHp}`, barX, cy + 32);
+        ctx.fillText(`HP ${m.currentHp}/${m.stats.hp}`, barX, cy + 32);
         // MP bar track + fill
         ctx.fillStyle = 'rgba(20,20,60,0.8)';
         ctx.fillRect(barX + 60, barY, barW - 60, 6);
@@ -1540,7 +1560,7 @@ class UI {
         // MP text
         ctx.fillStyle = 'rgba(140,180,240,0.7)';
         ctx.textAlign = 'right';
-        ctx.fillText(`MP ${m.currentMp}/${m.maxMp}`, cx + cardW - 5, cy + 32);
+        ctx.fillText(`MP ${m.currentMp}/${m.stats.mp}`, cx + cardW - 5, cy + 32);
       });
     }
 
@@ -1597,8 +1617,6 @@ class DialogueManager {
   }
 
   render(ctx, canvas) {
-    this.update(1/60);
-
     const W = canvas.width, H = canvas.height;
     const line = this.lines[this.index];
     if (!line || this.done) return;
@@ -2081,6 +2099,9 @@ class ScrollFlightManager {
 class ExploreManager {
   constructor(game) {
     this.game = game;
+    this.currentMap = 'warded_grounds';
+    this.locationCard = { text: 'WARDED GROUNDS', timer: 2.5 };
+    this.exitHintCooldown = 0;
     this.playerX = 300;
     this.playerY = 260;
     this.playerDir = 'down';
@@ -2159,7 +2180,7 @@ class ExploreManager {
         color: '#f5e01d',
         radius: 20,
         type: 'chest',
-        reward: { gold: 120, item: 'potion' },
+        reward: { gold: 120, item: 'healing_potion' },
         opened: false
       },
       {
@@ -2169,7 +2190,7 @@ class ExploreManager {
         color: '#80ffcc',
         radius: 20,
         type: 'chest',
-        reward: { gold: 250, item: 'elixir' },
+        reward: { gold: 250, item: 'full_restore' },
         opened: false
       },
       {
@@ -2184,9 +2205,27 @@ class ExploreManager {
     ];
 
     this.encounter_zones = [
-      { x: 280, y: 420, r: 72, enemy: ['abyss_tiger'],    bg: 'battle_bg',  used: false },
-      { x: 580, y: 430, r: 72, enemy: ['arcane_leopard'], bg: 'battle_bg2', used: false },
+      { id: 'grounds_abyss', x: 280, y: 420, r: 72, enemy: ['abyss_tiger'],    bg: 'battle_bg',  used: false },
+      { id: 'grounds_arcane', x: 580, y: 430, r: 72, enemy: ['arcane_leopard'], bg: 'battle_bg2', used: false },
     ];
+
+    this.mapStates = {
+      warded_grounds: { npcs: this.npcs, objects: this.objects, encounter_zones: this.encounter_zones },
+      echoing_verge: {
+        npcs: [{ id: 'verge_echo', x: 450, y: 190, label: 'Ward Echo', color: '#80e8ff', radius: 20,
+                 type: 'guide', dialogueKey: 'npc_ward_echo' }],
+        objects: [
+          { id: 'echo_cache', x: 735, y: 430, label: 'Verge Cache', color: '#80ffcc', radius: 20,
+            type: 'chest', reward: { gold: 180, item: 'ward_shard' }, opened: false },
+          { id: 'resonant_marker', x: 185, y: 390, label: 'Resonant Marker', color: '#80d8ff', radius: 25,
+            type: 'lore', discovered: false },
+        ],
+        encounter_zones: [
+          { id: 'verge_guardians', x: 590, y: 330, r: 72, enemy: ['abyss_tiger', 'arcane_leopard'],
+            bg: 'battle_bg2', used: false, verge: true },
+        ],
+      },
+    };
 
     this.walkCycle = 0;
     this.lastBg = 0;
@@ -2197,7 +2236,7 @@ class ExploreManager {
     // fixed positions needed, but a one-time spread at construction is fine).
     this.dust = [];
     this.dustTimer = 0;
-    this.motes = Array.from({ length: 18 }, () => ({
+    this.motes = Array.from({ length: this.game.reducedMotion ? 8 : 18 }, () => ({
       x: 32 + Math.random() * 836,
       y: 70 + Math.random() * 495,
       phase: Math.random() * 6.28,
@@ -2209,11 +2248,18 @@ class ExploreManager {
 
   init(savedData) {
     if (savedData) {
-      this.playerX = savedData.playerX || 400;
-      this.playerY = savedData.playerY || 300;
+      this.playerX = Number(savedData.playerX) || 400;
+      this.playerY = Number(savedData.playerY) || 300;
       this.battleCount = savedData.battleCount || 0;
       this.elderTalked = savedData.elderTalked || false;
       this.stoneTouched = savedData.stoneTouched || false;
+      // The Blaze Lion is spawned dynamically after guardian two. Recreate it
+      // before applying saved zone state so a mid-quest reload cannot remove
+      // the boss and soft-lock the Ward Stone.
+      if (this.battleCount >= 2 && !this.stoneTouched && !this.encounter_zones.some(z => z.id === 'grounds_blaze')) {
+        this.encounter_zones.push({ id: 'grounds_blaze', x: 750, y: 360, r: 60,
+          enemy: ['blaze_lion'], bg: 'battle_bg3', used: this.battleCount >= 3 });
+      }
       if (savedData.npcs) {
         savedData.npcs.forEach((ns, i) => {
           if (this.npcs[i]) this.npcs[i].talked = ns.talked;
@@ -2235,21 +2281,68 @@ class ExploreManager {
       // Recreate the post-quest hunt zones (fresh/un-used — they respawn anyway)
       // after the base-zone index restore above, so indices stay aligned.
       if (savedData.huntsSpawned) this.spawnHunts();
+      if (savedData.mapStates) {
+        Object.entries(savedData.mapStates).forEach(([mapId, state]) => {
+          const target = this.mapStates[mapId];
+          if (!target || !state) return;
+          (state.npcs || []).forEach(ns => Object.assign(target.npcs.find(n => n.id === ns.id) || {}, ns));
+          (state.objects || []).forEach(os => Object.assign(target.objects.find(o => o.id === os.id) || {}, os));
+          (state.encounter_zones || []).forEach(zs => Object.assign(target.encounter_zones.find(z => z.id && z.id === zs.id) || {}, zs));
+        });
+      }
+      const mapId = this.mapStates[savedData.currentMap] ? savedData.currentMap : 'warded_grounds';
+      this._activateMap(mapId);
+      this._clampPlayer();
     }
   }
 
   getSaveData() {
+    const grounds = this.mapStates.warded_grounds;
     return {
+      schemaVersion: SAVE_SCHEMA_VERSION,
+      currentMap: this.currentMap,
       playerX: this.playerX,
       playerY: this.playerY,
       battleCount: this.battleCount,
       elderTalked: this.elderTalked,
       stoneTouched: this.stoneTouched,
-      npcs: this.npcs.map(n => ({ talked: n.talked })),
-      objects: this.objects.map(o => ({ opened: o.opened, defeated: o.defeated })),
-      encounter_zones: this.encounter_zones.map(z => ({ used: z.used })),
+      npcs: grounds.npcs.map(n => ({ talked: n.talked })),
+      objects: grounds.objects.map(o => ({ opened: o.opened, defeated: o.defeated })),
+      encounter_zones: grounds.encounter_zones.map(z => ({ used: z.used })),
       huntsSpawned: this.huntsSpawned,
+      mapStates: Object.fromEntries(Object.entries(this.mapStates).map(([id, state]) => [id, {
+        npcs: state.npcs.map(n => ({ id: n.id, talked: !!n.talked, recruited: !!n.recruited })),
+        objects: state.objects.map(o => ({ id: o.id, opened: !!o.opened, defeated: !!o.defeated, discovered: !!o.discovered })),
+        encounter_zones: state.encounter_zones.filter(z => z.id).map(z => ({ id: z.id, used: !!z.used })),
+      }])),
     };
+  }
+
+  _activateMap(mapId) {
+    const state = this.mapStates[mapId];
+    if (!state) return false;
+    this.currentMap = mapId;
+    this.npcs = state.npcs;
+    this.objects = state.objects;
+    this.encounter_zones = state.encounter_zones;
+    return true;
+  }
+
+  switchMap(mapId, spawn) {
+    if (!this._activateMap(mapId)) return false;
+    this.playerX = spawn.x;
+    this.playerY = spawn.y;
+    this.playerDir = spawn.dir || 'down';
+    this.locationCard = { text: mapId === 'echoing_verge' ? 'THE ECHOING VERGE' : 'WARDED GROUNDS', timer: 3 };
+    this.dust.length = 0;
+    this.game.audio.playTone(mapId === 'echoing_verge' ? 520 : 360, 0.45, 'sine', 0.12);
+    this.game.save();
+    return true;
+  }
+
+  _clampPlayer() {
+    this.playerX = Math.max(32, Math.min(868, Number(this.playerX) || 450));
+    this.playerY = Math.max(65, Math.min(568, Number(this.playerY) || 300));
   }
 
   /** Star Sigil: a slow-turning constellation diamond with orbiting motes. */
@@ -2296,6 +2389,8 @@ class ExploreManager {
     const g = this.game;
     const input = g.input;
     const W = canvas.width, H = canvas.height;
+    if (this.locationCard.timer > 0) this.locationCard.timer -= dt;
+    if (this.exitHintCooldown > 0) this.exitHintCooldown -= dt;
 
     // Freeze the player while the iris wipe closes over the scene.
     if (g.battleTransition) { this._updateAmbient(dt, W, H); return; }
@@ -2315,23 +2410,34 @@ class ExploreManager {
       const px = Math.max(32, Math.min(W - 32, nx));
       const py = Math.max(65, Math.min(H - 32, ny));
       // Block Elder's Alcove platform (x:60-240, y:118-218) — player walks around it
-      const inPlatformX = px > 55 && px < 245;
-      const inPlatformY = py > 113 && py < 223;
-      // Block Ward Stone pedestal (x:676-764, y:118-210)
-      const inPedestalX = px > 671 && px < 769;
-      const inPedestalY = py > 113 && py < 215;
+      const blockers = this.currentMap === 'warded_grounds'
+        ? [{ x1: 55, x2: 245, y1: 113, y2: 223 }, { x1: 671, x2: 769, y1: 113, y2: 215 }]
+        : [{ x1: 330, x2: 570, y1: 245, y2: 305 }, { x1: 92, x2: 250, y1: 120, y2: 185 }];
+      const blocked = (x, y) => blockers.some(b => x > b.x1 && x < b.x2 && y > b.y1 && y < b.y2);
+      const inPlatformX = blocked(px, py);
+      const inPlatformY = inPlatformX;
+      const inPedestalX = false;
+      const inPedestalY = false;
       this.playerX = (inPlatformX && inPlatformY) ? this.playerX : px;
       this.playerY = (inPlatformX && inPlatformY) ? this.playerY :
                      (inPedestalX && inPedestalY) ? this.playerY : py;
       // Separate axis re-test for sliding along structure walls
       const pxOnly = Math.max(32, Math.min(W - 32, this.playerX + dx * this.speed * dt));
       const pyOnly = Math.max(65, Math.min(H - 32, this.playerY + dy * this.speed * dt));
-      const blockedX = (pxOnly > 55 && pxOnly < 245 && this.playerY > 113 && this.playerY < 223) ||
-                       (pxOnly > 671 && pxOnly < 769 && this.playerY > 113 && this.playerY < 215);
-      const blockedY = (this.playerX > 55 && this.playerX < 245 && pyOnly > 113 && pyOnly < 223) ||
-                       (this.playerX > 671 && this.playerX < 769 && pyOnly > 113 && pyOnly < 215);
+      const blockedX = blocked(pxOnly, this.playerY);
+      const blockedY = blocked(this.playerX, pyOnly);
       if (!blockedX) this.playerX = pxOnly;
       if (!blockedY) this.playerY = pyOnly;
+      if (this.currentMap === 'warded_grounds' && this.playerY >= H - 32 && this.playerX > 390 && this.playerX < 510) {
+        const trialDone = this.game.quests?.find(q => q.id === 'trial_of_wards')?.complete;
+        if (trialDone) { this.switchMap('echoing_verge', { x: 450, y: 105, dir: 'down' }); return; }
+        if (this.exitHintCooldown <= 0) {
+          this.game.ui.showNotification('The southern ward is sealed. Claim the Ward Stone first.');
+          this.exitHintCooldown = 2;
+        }
+      } else if (this.currentMap === 'echoing_verge' && this.playerY <= 65 && this.playerX > 390 && this.playerX < 510) {
+        this.switchMap('warded_grounds', { x: 450, y: 520, dir: 'up' }); return;
+      }
       if (dx < 0) this.playerDir = 'left';
       else if (dx > 0) this.playerDir = 'right';
       else if (dy < 0) this.playerDir = 'up';
@@ -2414,6 +2520,13 @@ class ExploreManager {
   }
 
   onBattleWin(zone) {
+    if (zone && zone.verge) {
+      this.game.ui.showNotification('The Verge grows quiet. Its ward-path is secure.');
+      this.game.addItem('ward_shard', 2);
+      this.game.gold += 100;
+      this.game.save();
+      return;
+    }
     // Replayable post-quest hunt: no quest progress, just rewards; the zone
     // re-arms after a cooldown (calcRewards already granted its exp/gold).
     if (zone && zone.hunt) {
@@ -2428,7 +2541,7 @@ class ExploreManager {
 
     // If all guardians beaten, trigger Blaze Lion encounter near ward stone
     if (this.battleCount === 2) {
-      this.encounter_zones.push({ x: 750, y: 360, r: 60, enemy: ['blaze_lion'], bg: 'battle_bg3', used: false });
+      this.encounter_zones.push({ id: 'grounds_blaze', x: 750, y: 360, r: 60, enemy: ['blaze_lion'], bg: 'battle_bg3', used: false });
     }
   }
 
@@ -2437,9 +2550,12 @@ class ExploreManager {
   spawnHunts() {
     if (this.huntsSpawned) return;
     this.huntsSpawned = true;
-    this.encounter_zones.push(
-      { x: 180, y: 300, r: 64, enemy: ['azure_tiger'], bg: 'battle_bg2', used: false, hunt: true, respawn: 12, cooldown: 0 },
-      { x: 720, y: 300, r: 64, enemy: ['arctic_lion'], bg: 'battle_bg',  used: false, hunt: true, respawn: 12, cooldown: 0 },
+    // Hunts belong to the Grounds even if the first post-quest update happens
+    // after loading or transitioning into another map.
+    const groundsZones = this.mapStates?.warded_grounds?.encounter_zones || this.encounter_zones;
+    groundsZones.push(
+      { id: 'grounds_azure_hunt', x: 180, y: 300, r: 64, enemy: ['azure_tiger'], bg: 'battle_bg2', used: false, hunt: true, respawn: 12, cooldown: 0 },
+      { id: 'grounds_arctic_hunt', x: 720, y: 300, r: 64, enemy: ['arctic_lion'], bg: 'battle_bg',  used: false, hunt: true, respawn: 12, cooldown: 0 },
     );
   }
 
@@ -2460,6 +2576,10 @@ class ExploreManager {
       const dist = Math.hypot(this.playerX - npc.x, this.playerY - npc.y);
       if (dist < npc.radius + 40) {
         g.audio.playConfirm();
+        if (npc.type === 'guide') {
+          g.startDialogue(npc.dialogueKey, () => { npc.talked = true; g.state = STATE.EXPLORE; g.save(); });
+          return;
+        }
         if (npc.type === 'recruit') {
           if (!npc.recruited) {
             g.startDialogue(npc.dialogueKey, () => {
@@ -2548,6 +2668,23 @@ class ExploreManager {
           return;
         }
 
+        if (obj.type === 'lore') {
+          if (obj.discovered) {
+            g.ui.showNotification('The marker repeats a steady answer: the ward-path holds.');
+            g.audio.playTone(520, 0.25, 'sine', 0.12);
+            return;
+          }
+          obj.discovered = true;
+          g.addItem('ether_orb');
+          g.gold += 75;
+          g.startDialogue('verge_marker', () => {
+            g.ui.showNotification('Discovery: +75 Gold, +1 Ether Orb');
+            g.state = STATE.EXPLORE;
+            g.save();
+          });
+          return;
+        }
+
         if (obj.id === 'ward_stone') {
           if (!g.isQuestStageDone('trial_of_wards', 'defeat_guardians')) {
             g.ui.showNotification('The Ward Stone pulses… defeat the guardians first!');
@@ -2595,9 +2732,13 @@ class ExploreManager {
 
   render(ctx, canvas) {
     const W = canvas.width, H = canvas.height;
-    this.update(1/60, canvas);
     const t = this.game.animTimer;
     const glow = this.game.titleGlow;
+
+    if (this.currentMap === 'echoing_verge') {
+      this._renderVerge(ctx, canvas, t, glow);
+      return;
+    }
 
     // ── Layer 1: Stone floor ────────────────────────────────
     this._renderFloor(ctx, W, H);
@@ -2636,14 +2777,54 @@ class ExploreManager {
 
     // ── Layer 10: HUD ────────────────────────────────────────
     this.game.ui.renderHUD(ctx, canvas);
-    this.renderPartyStatus(ctx, canvas);
     this._renderMinimap(ctx, canvas);
+    this._renderLocationCard(ctx, canvas);
+  }
+
+  _renderVerge(ctx, canvas, t, glow) {
+    const W = canvas.width, H = canvas.height;
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#071a2b'); sky.addColorStop(0.55, '#10253a'); sky.addColorStop(1, '#071018');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(80,210,230,0.18)'; ctx.lineWidth = 28; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(450, 60); ctx.bezierCurveTo(440, 190, 650, 300, 450, 590); ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,100,255,0.22)'; ctx.lineWidth = 3; ctx.stroke();
+    for (let i = 0; i < 34; i++) {
+      const x = 35 + ((i * 113) % 830), y = 75 + ((i * 67) % 480);
+      const a = 0.18 + Math.max(0, Math.sin(t * 1.6 + i)) * 0.35;
+      ctx.fillStyle = `rgba(120,230,255,${a})`; ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+    drawRoundedRect(ctx, 330, 245, 240, 60, 10, 'rgba(15,35,55,0.95)', 'rgba(90,210,230,0.45)', 2);
+    drawRoundedRect(ctx, 92, 120, 158, 65, 10, 'rgba(20,28,48,0.95)', 'rgba(150,100,255,0.4)', 2);
+    ctx.fillStyle = '#9eeeff'; ctx.font = '12px Cinzel, serif'; ctx.textAlign = 'center';
+    ctx.fillText('NORTH ARCH - WARDED GROUNDS', 450, 82);
+    this._renderEncounterZones(ctx, t, glow);
+    this._renderWardStone(ctx, t, glow);
+    this._renderNPCs(ctx, t, glow);
+    this.dust.forEach(d => { ctx.fillStyle = `rgba(150,220,240,${d.life * 0.35})`; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill(); });
+    this.renderPlayer(ctx, t);
+    this._renderHints(ctx);
+    this._renderAtmosphere(ctx, W, H, t, glow);
+    this.game.ui.renderHUD(ctx, canvas);
+    this._renderMinimap(ctx, canvas);
+    this._renderLocationCard(ctx, canvas);
+  }
+
+  _renderLocationCard(ctx, canvas) {
+    if (!this.locationCard || this.locationCard.timer <= 0) return;
+    const a = Math.min(1, this.locationCard.timer) * Math.min(1, (3 - this.locationCard.timer) * 2);
+    ctx.save(); ctx.globalAlpha = Math.max(0, a);
+    const cardY = Math.floor(canvas.height * 0.28);
+    ctx.fillStyle = 'rgba(2,5,14,0.78)'; ctx.fillRect(canvas.width / 2 - 190, cardY, 380, 48);
+    ctx.strokeStyle = 'rgba(120,210,255,0.65)'; ctx.strokeRect(canvas.width / 2 - 190, cardY, 380, 48);
+    ctx.fillStyle = '#d8f6ff'; ctx.font = "bold 18px 'Cinzel', serif"; ctx.textAlign = 'center';
+    ctx.fillText(this.locationCard.text, canvas.width / 2, cardY + 31); ctx.restore();
   }
 
   _renderMinimap(ctx, canvas) {
     const W = canvas.width, H = canvas.height;
     const mmW = 110, mmH = 80;
-    const mmX = 24, mmY = H - mmH - 24;
+    const mmX = (W - mmW) / 2, mmY = H - mmH - 24;
 
     // Outer frame with dark purple theme and cyan glow border
     drawRoundedRect(ctx, mmX, mmY, mmW, mmH, 8, 'rgba(8, 4, 24, 0.85)', 'rgba(0, 240, 255, 0.4)', 1.5);
@@ -2661,15 +2842,15 @@ class ExploreManager {
       ctx.fill();
     });
 
-    // Draw Ward Stone pedestal (purple diamond)
-    ctx.fillStyle = 'rgba(200, 160, 255, 0.7)';
-    ctx.fillRect(mmX + 720 * scaleX - 4, mmY + 148 * scaleY - 4, 8, 8);
-
-    // Draw Elder Ward NPC (blue dot)
-    ctx.fillStyle = '#80d0ff';
-    ctx.beginPath();
-    ctx.arc(mmX + 148 * scaleX, mmY + 170 * scaleY, 4, 0, Math.PI * 2);
-    ctx.fill();
+    // Map-specific points of interest and residents.
+    this.objects.forEach(obj => {
+      ctx.fillStyle = obj.type === 'chest' ? '#f0c060' : 'rgba(200,160,255,0.8)';
+      ctx.fillRect(mmX + obj.x * scaleX - 3, mmY + obj.y * scaleY - 3, 6, 6);
+    });
+    this.npcs.forEach(npc => {
+      ctx.fillStyle = npc.color || '#80d0ff';
+      ctx.beginPath(); ctx.arc(mmX + npc.x * scaleX, mmY + npc.y * scaleY, 3.5, 0, Math.PI * 2); ctx.fill();
+    });
 
     // Draw Player (pulsing yellow dot)
     const pulse = 1.0 + Math.sin(this.game.animTimer * 10) * 0.25;
@@ -2905,7 +3086,7 @@ class ExploreManager {
       if (zone.used) return;
 
       const pulse = 0.5 + Math.sin(t * 2.5) * 0.3;
-      const enemyDef = this.game.data.enemies.find(e => e.id === zone.enemy[0]);
+      const enemyDefs = zone.enemy.map(id => this.game.data.enemies.find(e => e.id === id)).filter(Boolean);
 
       // Cracked floor fissure — radiating lines from center
       ctx.save();
@@ -2936,25 +3117,27 @@ class ExploreManager {
       ctx.restore();
 
       // Enemy portrait (small, above zone)
-      if (enemyDef) {
-        const img = this.game.images[`assets/enemies/${zone.enemy[0]}.png`];
-        if (img) {
+      if (enemyDefs.length) {
+        const bob = Math.sin(t * 2) * 3;
+        enemyDefs.slice(0, 2).forEach((enemyDef, index) => {
+          const img = this.game.images[enemyDef.portrait];
+          if (!img) return;
           const s = 54;
-          const bob = Math.sin(t * 2) * 3;
+          const offset = (index - (Math.min(enemyDefs.length, 2) - 1) / 2) * 34;
           ctx.save();
           ctx.globalAlpha = 0.85;
           ctx.shadowColor = 'rgba(220,60,60,0.6)';
           ctx.shadowBlur = 12;
-          ctx.drawImage(img, zone.x - s/2, zone.y - s - 8 + bob, s, s);
+          ctx.drawImage(img, zone.x - s/2 + offset, zone.y - s - 8 + bob - index * 4, s, s);
           ctx.restore();
-          // Name tag
-          ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillRect(zone.x - 48, zone.y + 6, 96, 16);
-          ctx.fillStyle = `rgba(255,120,120,${0.7 + glow * 0.3})`;
-          ctx.font = 'bold 10px Georgia, serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(enemyDef.name, zone.x, zone.y + 17);
-        }
+        });
+        const label = enemyDefs.length > 1 ? 'Twin Guardians' : enemyDefs[0].name;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(zone.x - 56, zone.y + 6, 112, 16);
+        ctx.fillStyle = `rgba(255,120,120,${0.7 + glow * 0.3})`;
+        ctx.font = 'bold 10px Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, zone.x, zone.y + 17);
       }
     });
   }
@@ -3878,6 +4061,7 @@ class BattleManager {
   }
 
   spawnBattleParticles(x, y, color = '#ffbb33', count = 18) {
+    if (this.game.reducedMotion) count = Math.max(3, Math.ceil(count * 0.4));
     const colors = Array.isArray(color) ? color : [color, '#ffffff', '#ff6633'];
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -3918,8 +4102,9 @@ class BattleManager {
 
   spawnVictoryBurst(cx, cy) {
     const colors = ['#f0d060', '#d080ff', '#60e0ff', '#ff8060', '#80ff80'];
-    for (let i = 0; i < 60; i++) {
-      const angle = (Math.PI * 2 * i) / 60 + Math.random() * 0.2;
+    const count = this.game.reducedMotion ? 18 : 60;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.2;
       const speed = 80 + Math.random() * 200;
       this.victoryParticles.push({
         x: cx, y: cy,
@@ -4443,8 +4628,8 @@ class BattleManager {
     }
 
     // Screen shake — applied to the enemy area only (leaves UI stable)
-    const shakeOffX = this.shakeX > 0 ? (Math.random() - 0.5) * this.shakeX * 2 : 0;
-    const shakeOffY = this.shakeY > 0 ? (Math.random() - 0.5) * this.shakeY * 2 : 0;
+    const shakeOffX = !this.game.reducedMotion && this.shakeX > 0 ? (Math.random() - 0.5) * this.shakeX * 2 : 0;
+    const shakeOffY = !this.game.reducedMotion && this.shakeY > 0 ? (Math.random() - 0.5) * this.shakeY * 2 : 0;
 
     // Reset position tracking each frame
     this.enemyPositions = [];
@@ -5295,5 +5480,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   ctx.fillStyle = '#6030a0';
   ctx.fillText('Loading...', canvas.width/2, canvas.height/2 + 20);
 
-  await game.init();
+  try {
+    await game.init();
+  } catch (error) {
+    console.error('Game initialization failed:', error);
+    ctx.fillStyle = '#050010';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f08090';
+    ctx.font = "bold 24px 'Cinzel', Georgia, serif";
+    ctx.textAlign = 'center';
+    ctx.fillText('THE WARDS COULD NOT FORM', canvas.width / 2, canvas.height / 2 - 24);
+    ctx.fillStyle = '#d0b8e8';
+    ctx.font = '15px Georgia, serif';
+    ctx.fillText('Game data failed to load. Refresh the page to try again.', canvas.width / 2, canvas.height / 2 + 16);
+    ctx.fillStyle = '#806898';
+    ctx.font = '11px monospace';
+    ctx.fillText('If this continues, check your connection or clear the site cache.', canvas.width / 2, canvas.height / 2 + 44);
+  }
 });

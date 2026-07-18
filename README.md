@@ -25,7 +25,7 @@ Play as Motley Max and his Jester companions as they battle through the
 Warded Grounds to claim the legendary Ward Stone — then gather the full
 company of six and answer what prowls between the stars.
 
-### Features (v0.2)
+### Features (v0.3)
 - ✦ Branded title screen with animated effects
 - ✦ Scroll-scrubbed cinematics — scrolling flies the camera over the live
   game map: it descends onto each story beat, then pulls up to a god's-eye
@@ -35,7 +35,8 @@ company of six and answer what prowls between the stars.
   preferences. (Scrub engine + camera architecture adapted from
   [scroll-world](https://github.com/oso95/scroll-world), MIT)
 - ✦ Intro cutscene with progressive dialogue
-- ✦ Explorable area with NPCs, chests, and interactive objects
+- ✦ Two explorable areas: the Warded Grounds and post-trial Echoing Verge,
+  with gated travel, return path, distinct atmosphere, discoveries, and encounters
 - ✦ Turn-based combat with Attack / Ability / Item / Defend, per-element hit
   effects, LCK-driven critical hits, and an iris battle-transition wipe
 - ✦ Tactical status effects that actually bite — burn/poison tick, freeze
@@ -50,6 +51,9 @@ company of six and answer what prowls between the stars.
 - ✦ Living exploration — drifting ward-motes and footstep dust
 - ✦ Defeat screen with Retry Battle / Wake options
 - ✦ Save / Load via browser localStorage, with an overwrite guard on New Game
+- ✦ Map-aware save migration preserves existing v0.2 saves and rejects invalid destinations
+- ✦ Data-driven portrait preloading, reduced-motion effects, accurate playtime,
+  and a visible recovery screen when game data cannot load
 - ✦ Keyboard, mouse/click, and mobile touch controls
 
 ---
@@ -100,6 +104,14 @@ To run locally:
 cd docs
 python3 -m http.server 8080
 # then open http://localhost:8080
+```
+
+Validation:
+```bash
+node --check docs/game.js
+node tests/validate-data.mjs
+node tests/world-save.test.mjs
+node tests/full-flow.test.mjs
 ```
 
 ---
