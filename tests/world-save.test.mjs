@@ -7,9 +7,10 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const storage = new Map();
 let storageFails = false;
+const expectedLogs = [];
 const noop = () => {};
 const context = vm.createContext({
-  console,
+  console: { ...console, error: (...args) => expectedLogs.push(['error', ...args]), warn: (...args) => expectedLogs.push(['warn', ...args]) },
   Math,
   Date,
   setTimeout,
@@ -96,4 +97,5 @@ denied.explore = new ExploreManager(denied);
 assert.equal(denied.save(), false);
 assert.equal(denied.load(), false);
 storageFails = false;
-console.log('World/save tests passed: 19 assertions across map registry, hunt ownership, roundtrip, legacy migration, boss restoration, unknown-map fallback, corrupt JSON, and unavailable storage.');
+assert.equal(expectedLogs.length, 3, 'corrupt, quota, and denied-storage paths should each report once');
+console.log('World/save tests passed: 20 assertions across map registry, hunt ownership, roundtrip, legacy migration, boss restoration, unknown-map fallback, corrupt JSON, and unavailable storage.');

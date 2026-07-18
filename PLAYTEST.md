@@ -46,12 +46,14 @@ fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
 | Check | Result |
 |---|---|
 | Deterministic full-flow integration | ✅ both quests, recruits, bosses, hunts, Verge, return |
-| World/save assertions | ✅ 19 passed |
+| World/save assertions | ✅ 20 passed |
 | Data validation | ✅ 6 characters, 6 enemies, 37 abilities, 5 items, 2 quests, 18 dialogues |
 | Echoing Verge visual render | ✅ zero console errors |
 | Hunt ownership after loading/updating in Verge | ✅ fixed; hunts remain in Grounds |
 | Exploration HUD overlap / invalid HP-MP maxima | ✅ fixed |
 | Narrow viewport horizontal overflow | ✅ fixed at 390×844 |
+| Grounds chest rewards | ✅ valid Healing Potion / Full Restore IDs |
+| Defeat Retry / Wake | ✅ pre-battle restore and exploration revival covered |
 
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 

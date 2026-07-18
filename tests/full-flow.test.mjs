@@ -58,6 +58,11 @@ function interactAt(x, y) {
 // Quest 1: Elder, two roaming guardians, dynamic Blaze Lion, Ward Stone.
 interactAt(148, 225); drainDialogue();
 assert.equal(game.isQuestStageDone('trial_of_wards', 'speak_elder'), true);
+interactAt(420, 160);
+interactAt(720, 480);
+assert.ok(game.inventory.some(i => i.id === 'healing_potion' && i.quantity >= 4));
+assert.ok(game.inventory.some(i => i.id === 'full_restore'));
+assert.equal(game.inventory.some(i => !game.getItemDef(i.id)), false, 'all chest rewards must be usable items');
 for (const id of ['grounds_abyss', 'grounds_arcane']) {
   const zone = game.explore.encounter_zones.find(z => z.id === id);
   zone.used = true; game.explore.triggerBattle(zone.enemy, zone.bg, zone); drainDialogue(); winPendingBattle();
@@ -106,4 +111,18 @@ game.explore.update(1 / 30, canvas); game.input.keys.ArrowUp = false;
 assert.equal(game.explore.currentMap, 'warded_grounds');
 assert.equal(game.explore.playerY, 520, 'return spawn must clear the entry trigger');
 
-console.log('Full-flow integration passed: both quests, six recruits, four bosses/encounters, hunts, Echoing Verge activities, map return, and persistence.');
+// Defeat exits: Retry restores the exact pre-battle party; Wake returns to exploration.
+const retryHp = game.party.map(m => [m.id, m.currentHp]);
+game.startBattle(['abyss_tiger'], 'battle_bg', noop, () => game.explore.onBattleLose());
+game.battle.party.forEach(m => { m.currentHp = 0; });
+assert.equal(game.battle.checkBattleEnd(), true);
+assert.equal(game.state, STATE.DEFEAT);
+game.retryLastBattle();
+for (const [id, hp] of retryHp) assert.equal(game.party.find(m => m.id === id).currentHp, hp);
+game.battle.party.forEach(m => { m.currentHp = 0; });
+game.battle.checkBattleEnd();
+game.battle.endDefeat();
+assert.equal(game.state, STATE.EXPLORE);
+assert.ok(game.party.every(m => m.currentHp > 0), 'Wake must revive the defeated party');
+
+console.log('Full-flow integration passed: both quests, six-member party, chest rewards, encounters, hunts, Echoing Verge, persistence, Retry, and Wake.');

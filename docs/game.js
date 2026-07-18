@@ -2178,7 +2178,7 @@ class ExploreManager {
         color: '#f5e01d',
         radius: 20,
         type: 'chest',
-        reward: { gold: 120, item: 'potion' },
+        reward: { gold: 120, item: 'healing_potion' },
         opened: false
       },
       {
@@ -2188,7 +2188,7 @@ class ExploreManager {
         color: '#80ffcc',
         radius: 20,
         type: 'chest',
-        reward: { gold: 250, item: 'elixir' },
+        reward: { gold: 250, item: 'full_restore' },
         opened: false
       },
       {
