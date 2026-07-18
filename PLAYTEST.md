@@ -21,6 +21,24 @@ interact range). Run it after any engine or content change.
 7. Star Sigil (455,95 — stand clear of the gold chest's radius) →
    Astral Cougar → fight to victory → Quest 2 complete.
 8. `game.save(); game.load()` roundtrip; check `console.error` capture.
+9. After Quest 1, walk through the south gate (x 390–510, y=568) into The
+   Echoing Verge. Verify the arrival card and that held movement does not bounce
+   back through the transition.
+10. Speak to the Ward Echo, examine the Resonant Marker, open the Verge Cache,
+    and defeat the paired guardians. Verify each reward occurs only once.
+11. Save/load inside the Verge, return through the north arch, then save/load
+    again in the Grounds. Verify location and per-map object/encounter state.
+
+## Automated checks
+
+```bash
+node --check docs/game.js
+node tests/validate-data.mjs
+node tests/world-save.test.mjs
+```
+
+The world/save test covers schema-2 roundtrip, v1 migration, unknown-map
+fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
 
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 

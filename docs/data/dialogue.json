@@ -243,6 +243,35 @@
       "text": "Everyone - TOGETHER!"
     }
   ],
+  "npc_ward_echo": [
+    {
+      "speaker": "Ward Echo",
+      "portrait": null,
+      "text": "The Ward Stone has opened this old path. Beyond the Grounds, every stable ward leaves an echo."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "A road that remembers us? Finally, an audience with a decent memory."
+    },
+    {
+      "speaker": "Ward Echo",
+      "portrait": null,
+      "text": "Quiet the guardians near the crossing, and listen for the Resonant Marker. Both have waited for a Ward-Keeper."
+    }
+  ],
+  "verge_marker": [
+    {
+      "speaker": "Resonant Marker",
+      "portrait": null,
+      "text": "A clear tone travels through the stone: the restored Ward Stone now reaches beyond its old boundary."
+    },
+    {
+      "speaker": "Motley Max",
+      "portrait": "assets/characters/motley_max.png",
+      "text": "Then the Grounds were only the first verse. Good. I was just finding the rhythm."
+    }
+  ],
   "astral_hunt_complete": [
     {
       "speaker": "Sir Paradox",
