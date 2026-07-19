@@ -117,9 +117,13 @@ Validation:
 ```bash
 node --check docs/game.js
 node tests/validate-data.mjs
+node tests/battle-balance.test.mjs
 node tests/world-save.test.mjs
 node tests/full-flow.test.mjs
 ```
+
+The staged Godot migration contract and parity gates are documented in
+[GODOT_PORT.md](GODOT_PORT.md). The browser build remains canonical.
 
 ---
 
