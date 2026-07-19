@@ -5430,6 +5430,12 @@ function setupTouchControls(game) {
     btn.addEventListener('touchstart', down, { passive: false });
     btn.addEventListener('touchend', up, { passive: false });
     btn.addEventListener('touchcancel', up, { passive: false });
+    btn.addEventListener('keydown', (e) => {
+      if (e.code !== 'Enter' && e.code !== 'Space') return;
+      e.preventDefault();
+      e.stopPropagation();
+      press(code);
+    });
   });
 
   document.querySelectorAll('#touch-actions .touch-btn[data-tap]').forEach(btn => {
@@ -5437,6 +5443,12 @@ function setupTouchControls(game) {
       e.preventDefault();
       press(btn.dataset.tap);
     }, { passive: false });
+    btn.addEventListener('keydown', (e) => {
+      if (e.code !== 'Enter' && e.code !== 'Space') return;
+      e.preventDefault();
+      e.stopPropagation();
+      press(btn.dataset.tap);
+    });
   });
 }
 

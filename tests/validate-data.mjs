@@ -10,6 +10,7 @@ const abilities = read('abilities.json');
 const items = read('items.json');
 const quests = read('quests.json');
 const dialogue = read('dialogue.json');
+const indexHtml = fs.readFileSync(path.join(root, 'docs', 'index.html'), 'utf8');
 const errors = [];
 const unique = (rows, label) => {
   const seen = new Set();
@@ -41,6 +42,10 @@ for (const actor of [...characters, ...enemies]) {
 for (const asset of ['assets/characters/motley_max_sprite.png']) {
   if (!fs.existsSync(path.join(root, 'docs', asset))) errors.push(`missing runtime asset ${asset}`);
 }
+for (const label of ['Move up', 'Move down', 'Move left', 'Move right', 'Open quest journal', 'Cancel or pause', 'Interact or confirm']) {
+  if (!indexHtml.includes(`aria-label="${label}"`)) errors.push(`missing accessible touch control: ${label}`);
+}
+if (!indexHtml.includes('data-tap="KeyJ"')) errors.push('missing mobile quest journal action');
 
 if (errors.length) {
   console.error(errors.join('\n'));

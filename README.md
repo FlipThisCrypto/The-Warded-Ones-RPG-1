@@ -56,6 +56,7 @@ company of six and answer what prowls between the stars.
 - ✦ Data-driven portrait preloading, reduced-motion effects, accurate playtime,
   and a visible recovery screen when game data cannot load
 - ✦ Keyboard, mouse/click, and mobile touch controls
+- ✦ Labeled touch buttons with a dedicated mobile quest-journal action
 
 ---
 
@@ -66,6 +67,7 @@ company of six and answer what prowls between the stars.
 | WASD / Arrow Keys | Move |
 | F / Enter | Interact / Confirm |
 | X / Escape | Cancel / Pause |
+| J | Quest Journal |
 | Click | All menus and targets |
 
 ---

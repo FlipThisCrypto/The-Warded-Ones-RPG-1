@@ -58,6 +58,7 @@ fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
 | Recruit + Astral Cougar portrait preload | ✅ derived from character/enemy data |
 | Reduced-motion performance path | ✅ fewer motes/particles and no battle shake |
 | Player world representation | ✅ full-body transparent sprite, walking sway, directional mirror, grounded shadow |
+| Mobile quest journal / control labels | ✅ dedicated Journal action, semantic buttons, visible keyboard focus |
 
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 
