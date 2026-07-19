@@ -59,6 +59,8 @@ company of six and answer what prowls between the stars.
 - ✦ Labeled touch buttons with a dedicated mobile quest-journal action
 - ✦ A distinct Echoing Verge map with floating ward fragments, an echo dial,
   a shattered resonance span, cache, lore marker, and guardian encounter
+- ✦ Measured post-level-5 encounter scaling that preserves authored campaign
+  balance, keeps bosses relevant, and increases rewards proportionally
 
 ---
 

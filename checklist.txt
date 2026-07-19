@@ -270,6 +270,7 @@ Phase 14 — Writing
  Tutorials
 Phase 15 — Polish
  Balance
+ [x] Deterministic post-level-5 balance gate and bounded encounter scaling
  QA
  Bug fixing
  Optimization

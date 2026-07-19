@@ -5,8 +5,9 @@ This file teaches future Claude Code sessions how to work safely in this reposit
 ## The One Thing (Current)
 The game has two complete quests, six playable Jesters, mobile support, and
 a second explorable map. The v0.3 desktop/touch acceptance and Echoing Verge
-identity passes are complete. The next priority is: **make battle balance
-measurable and tune it beyond level 5 before adding more encounters**.
+identity passes are complete, and post-level-5 balance is now measured. The
+next priority is: **write the Godot 4 port plan with explicit browser-parity
+gates before creating a second implementation**.
 
 ## Project Overview
 Browser-based RPG vertical slice built with vanilla HTML5 Canvas/JavaScript. Hosted on GitHub Pages from `/docs`.
@@ -156,7 +157,8 @@ git push origin main
 ## Known Issues (v0.3)
 - Browser screenshot tool timeout in embedded panes (RAF throttling —
   drive `game.update(1/60)` manually when testing; see PLAYTEST.md)
-- Battle balance is untuned for levels beyond ~5
+- The browser game is the only implementation; Godot 4 port scope and parity
+  gates are not yet documented.
 
 ## Definition of Done
 A feature is done when: implemented, integrated, tested via browser JS console, and documented.
