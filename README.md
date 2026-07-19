@@ -48,7 +48,8 @@ company of six and answer what prowls between the stars.
 - ✦ Two chained story quests, a distinct boss theme, and a quest journal (J)
 - ✦ Post-quest respawning hunts for extra battles and EXP
 - ✦ EXP bars + a level-up fanfare showing every stat gain
-- ✦ Living exploration — drifting ward-motes and footstep dust
+- ✦ Living exploration — a full-body Motley Max world sprite with grounded
+  movement, drifting ward-motes, and footstep dust
 - ✦ Defeat screen with Retry Battle / Wake options
 - ✦ Save / Load via browser localStorage, with an overwrite guard on New Game
 - ✦ Map-aware save migration preserves existing v0.2 saves and rejects invalid destinations

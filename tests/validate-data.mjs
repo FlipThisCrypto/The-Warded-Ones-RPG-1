@@ -38,6 +38,9 @@ for (const [key, lines] of Object.entries(dialogue)) {
 for (const actor of [...characters, ...enemies]) {
   if (actor.portrait && !fs.existsSync(path.join(root, 'docs', actor.portrait))) errors.push(`${actor.id}: missing portrait ${actor.portrait}`);
 }
+for (const asset of ['assets/characters/motley_max_sprite.png']) {
+  if (!fs.existsSync(path.join(root, 'docs', asset))) errors.push(`missing runtime asset ${asset}`);
+}
 
 if (errors.length) {
   console.error(errors.join('\n'));

@@ -57,6 +57,7 @@ fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
 | Real-delta simulation / paused movement | ✅ rendering no longer mutates gameplay |
 | Recruit + Astral Cougar portrait preload | ✅ derived from character/enemy data |
 | Reduced-motion performance path | ✅ fewer motes/particles and no battle shake |
+| Player world representation | ✅ full-body transparent sprite, walking sway, directional mirror, grounded shadow |
 
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 

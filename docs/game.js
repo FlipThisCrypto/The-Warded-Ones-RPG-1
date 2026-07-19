@@ -83,6 +83,7 @@ class WardedOnesGame {
       'assets/ui/logo.png',
       'assets/ui/banner.png',
       'assets/ui/title_char.png',
+      'assets/characters/motley_max_sprite.png',
       ...chars.map(c => c.portrait).filter(Boolean),
       ...enemies.map(e => e.portrait).filter(Boolean),
       'assets/backgrounds/battle_bg.jpg',
@@ -3466,55 +3467,53 @@ class ExploreManager {
                      this.game.input.isDown('ArrowUp') || this.game.input.isDown('ArrowDown') ||
                      this.game.input.isDown('KeyA') || this.game.input.isDown('KeyD') ||
                      this.game.input.isDown('KeyW') || this.game.input.isDown('KeyS');
-    const bob = isMoving ? Math.sin(t * 12) * 3 : 0;
-    const y = this.playerY + bob;
+    const stride = isMoving ? Math.sin(t * 12) : 0;
+    const bob = isMoving ? -Math.abs(stride) * 3 : Math.sin(t * 2) * 0.7;
+    const sprite = this.game.images['assets/characters/motley_max_sprite.png'];
     const portrait = this.game.images['assets/characters/motley_max.png'];
-    const size = 48;
+    const spriteSize = 92;
+    const feetY = this.playerY + 27;
 
     // Floor shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
-    ctx.ellipse(x, this.playerY + size * 0.4, size * 0.4, size * 0.12, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, feetY - 2, 22 + Math.abs(stride) * 2, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Player glow
-    const pGlow = ctx.createRadialGradient(x, y, 0, x, y, size);
-    pGlow.addColorStop(0, 'rgba(160,80,255,0.15)');
+    // Low ward aura keeps the silhouette readable without putting it in a token.
+    const pGlow = ctx.createRadialGradient(x, feetY - 34, 0, x, feetY - 34, 54);
+    pGlow.addColorStop(0, 'rgba(160,80,255,0.12)');
     pGlow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = pGlow;
     ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.arc(x, feetY - 34, 54, 0, Math.PI * 2);
     ctx.fill();
 
-    if (portrait) {
+    if (sprite) {
       ctx.save();
-      // Pulsing ring
-      const ringAlpha = 0.5 + Math.sin(t * 3) * 0.25;
-      ctx.beginPath();
-      ctx.arc(x, y, size/2 + 4, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(200,140,255,${ringAlpha})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Portrait clipped to circle
-      ctx.beginPath();
-      ctx.arc(x, y, size/2, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(portrait, x - size/2, y - size/2, size, size);
+      ctx.translate(x, feetY + bob);
+      if (this.playerDir === 'left') ctx.scale(-1, 1);
+      ctx.rotate(isMoving ? stride * 0.025 : 0);
+      ctx.drawImage(sprite, -spriteSize / 2, -spriteSize, spriteSize, spriteSize);
+      ctx.restore();
+    } else if (portrait) {
+      // Graceful fallback if the dedicated sprite cannot load.
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, this.playerY, 24, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(portrait, x - 24, this.playerY - 24, 48, 48);
       ctx.restore();
     } else {
       ctx.fillStyle = '#8040ff';
-      ctx.beginPath();
-      ctx.arc(x, y, size/2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(x - 12, this.playerY - 38, 24, 58);
     }
 
     // Name tag
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(x - 38, y + size/2 + 4, 76, 15);
+    ctx.fillRect(x - 38, feetY + 5, 76, 15);
     ctx.fillStyle = '#e0c0ff';
     ctx.font = 'bold 10px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Motley Max', x, y + size/2 + 14);
+    ctx.fillText('Motley Max', x, feetY + 16);
   }
 
   renderPartyStatus(ctx, canvas) {
