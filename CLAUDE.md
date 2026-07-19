@@ -6,8 +6,9 @@ This file teaches future Claude Code sessions how to work safely in this reposit
 The game has two complete quests, six playable Jesters, mobile support, and
 a second explorable map. The v0.3 desktop/touch acceptance and Echoing Verge
 identity passes are complete, and post-level-5 balance is now measured. The
-next priority is: **write the Godot 4 port plan with explicit browser-parity
-gates before creating a second implementation**.
+Godot 4 parity contract is documented in `GODOT_PORT.md`. The next priority is:
+**complete only Godot Gate 0: project skeleton, shared JSON loader, asset
+validation, and a headless smoke test**.
 
 ## Project Overview
 Browser-based RPG vertical slice built with vanilla HTML5 Canvas/JavaScript. Hosted on GitHub Pages from `/docs`.
@@ -157,8 +158,8 @@ git push origin main
 ## Known Issues (v0.3)
 - Browser screenshot tool timeout in embedded panes (RAF throttling —
   drive `game.update(1/60)` manually when testing; see PLAYTEST.md)
-- The browser game is the only implementation; Godot 4 port scope and parity
-  gates are not yet documented.
+- Godot Gate 0 is not implemented; do not port gameplay until its shared-data
+  and asset-validation smoke test passes.
 
 ## Definition of Done
 A feature is done when: implemented, integrated, tested via browser JS console, and documented.

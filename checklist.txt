@@ -313,3 +313,7 @@ The most important checkbox isn't "Release RPG I."
 It's:
 
  The Warded Ones RPG Factory can create an entire new RPG campaign, from concept to playable build, using the same engine and AI pipeline.
+
+Godot 4 Port
+ [x] Parity-first migration plan, non-goals, shared-data contract, and five gated milestones
+ [ ] Gate 0: project skeleton, shared JSON loader, asset validation, and headless smoke test
