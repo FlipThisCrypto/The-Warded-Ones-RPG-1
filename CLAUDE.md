@@ -4,8 +4,9 @@ This file teaches future Claude Code sessions how to work safely in this reposit
 
 ## The One Thing (Current)
 The game has two complete quests, six playable Jesters, mobile support, and
-a second explorable map. The next priority is: **complete a real full browser
-playthrough of the v0.3 two-map route and tune/fix anything it reveals**.
+a second explorable map. The v0.3 desktop/touch acceptance pass is complete.
+The next priority is: **give the Echoing Verge a more bespoke visual identity
+without expanding its scope or changing the proven two-map route**.
 
 ## Project Overview
 Browser-based RPG vertical slice built with vanilla HTML5 Canvas/JavaScript. Hosted on GitHub Pages from `/docs`.
@@ -152,11 +153,11 @@ git push origin main
   segments/offsets rebuild themselves. Scrub math + architecture adapted
   from github.com/oso95/scroll-world (MIT, attributed in the class header)
 
-## Known Issues (v0.2)
+## Known Issues (v0.3)
 - Browser screenshot tool timeout in embedded panes (RAF throttling —
   drive `game.update(1/60)` manually when testing; see PLAYTEST.md)
-- The Echoing Verge is procedurally rendered; it has not yet received bespoke
-  runtime artwork.
+- The Echoing Verge is procedurally rendered; its visual identity needs a
+  focused bespoke-art pass without changing map scope.
 - Battle balance is untuned for levels beyond ~5
 
 ## Definition of Done
