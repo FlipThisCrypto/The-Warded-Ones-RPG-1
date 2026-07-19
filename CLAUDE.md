@@ -103,7 +103,8 @@ git push origin main
   (`recruit: true` in characters.json; recruit NPCs in ExploreManager)
 - Two chained quests (quests.json `unlocks` field); quest journal on J
 - Astral Cougar boss at the animated Star Sigil; enemy AoE support
-- Mobile touch controls (D-pad + ✦/✕ buttons, auto-shown on touch screens)
+- Mobile touch controls (D-pad + Journal/✦/✕ buttons, auto-shown on touch
+  screens) use labeled semantic buttons with visible keyboard focus.
 - Defeat screen: ENTER retries the battle (pre-battle party snapshot),
   ESC wakes at half HP; lost encounter zones re-arm (no quest soft-lock)
 - Audio settings persist (warded_ones_settings_v1); saves persist chest/
