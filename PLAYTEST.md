@@ -60,6 +60,15 @@ fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
 | Player world representation | ✅ full-body transparent sprite, walking sway, directional mirror, grounded shadow |
 | Mobile quest journal / control labels | ✅ dedicated Journal action, semantic buttons, visible keyboard focus |
 
+## Results — 2026-07-19 (v0.3 browser acceptance)
+
+| Check | Result |
+|---|---|
+| Desktop title → prologue → intro → Grounds | ✅ rendered and advanced through real canvas controls; zero console warnings/errors |
+| Echoing Verge arrival at canonical spawn | ✅ verified at desktop and 390×844 touch layout |
+| Verge north-arch wayfinding | ✅ moved clear of the player arrival sprite and shortened for faster scanning |
+| Complete two-map route and persistence | ✅ deterministic full-flow + 20 world/save assertions |
+
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 
 | Check | Result |

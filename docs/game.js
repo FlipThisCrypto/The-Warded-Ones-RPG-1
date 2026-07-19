@@ -2798,7 +2798,7 @@ class ExploreManager {
     drawRoundedRect(ctx, 330, 245, 240, 60, 10, 'rgba(15,35,55,0.95)', 'rgba(90,210,230,0.45)', 2);
     drawRoundedRect(ctx, 92, 120, 158, 65, 10, 'rgba(20,28,48,0.95)', 'rgba(150,100,255,0.4)', 2);
     ctx.fillStyle = '#9eeeff'; ctx.font = '12px Cinzel, serif'; ctx.textAlign = 'center';
-    ctx.fillText('NORTH ARCH - WARDED GROUNDS', 450, 82);
+    ctx.fillText('↑ WARDED GROUNDS', 665, 82);
     this._renderEncounterZones(ctx, t, glow);
     this._renderWardStone(ctx, t, glow);
     this._renderNPCs(ctx, t, glow);
