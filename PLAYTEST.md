@@ -34,6 +34,7 @@ interact range). Run it after any engine or content change.
 ```bash
 node --check docs/game.js
 node tests/validate-data.mjs
+node tests/battle-balance.test.mjs
 node tests/world-save.test.mjs
 node tests/full-flow.test.mjs
 ```
@@ -69,6 +70,7 @@ fallback, corrupt JSON, and Blaze Lion restoration from a mid-quest save.
 | Verge north-arch wayfinding | ✅ moved clear of the player arrival sprite and shortened for faster scanning |
 | Complete two-map route and persistence | ✅ deterministic full-flow + 20 world/save assertions |
 | Echoing Verge identity pass | ✅ drifting ward fragments, echo dial, resonance span, exit plaque; reduced-motion safe |
+| Post-level-5 battle balance | ✅ authored stats preserved through L5; Astral Cougar durability L5=2.88 / L10=2.92 basic rounds |
 
 ## Results — 2026-07-16 (loop 3, after items 1–8)
 

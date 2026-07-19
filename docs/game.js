@@ -694,6 +694,35 @@ class WardedOnesGame {
   }
 
   // ─── Battle ───────────────────────────────────────────────
+  scaleEnemyForParty(def) {
+    const active = this.party.filter(m => m.currentHp > 0);
+    const averageLevel = active.length
+      ? active.reduce((sum, m) => sum + (m.level || 1), 0) / active.length
+      : 1;
+    // Authored campaign balance remains untouched through level 5. Beyond it,
+    // modest linear scaling keeps hunts and bosses relevant without mutating
+    // the shared JSON definitions or making level gains feel punitive.
+    const bonusLevels = Math.min(20, Math.max(0, Math.floor(averageLevel) - 5));
+    const hpScale = 1 + bonusLevels * 0.14;
+    const rewardScale = 1 + bonusLevels * 0.08;
+    const stats = {
+      ...def.stats,
+      hp: Math.round(def.stats.hp * hpScale),
+      mp: def.stats.mp + bonusLevels * 4,
+      atk: def.stats.atk + bonusLevels * 2,
+      def: def.stats.def + bonusLevels,
+      spd: def.stats.spd + Math.floor(bonusLevels / 2),
+      lck: def.stats.lck + Math.floor(bonusLevels / 2),
+    };
+    const rewards = def.rewards ? {
+      ...def.rewards,
+      exp: Math.round(def.rewards.exp * rewardScale),
+      gold: Math.round(def.rewards.gold * rewardScale),
+      items: [...(def.rewards.items || [])],
+    } : def.rewards;
+    return { ...def, stats, rewards, encounterLevel: 5 + bonusLevels };
+  }
+
   startBattle(enemyIds, bgKey, onWin, onLose) {
     // Snapshot for the defeat-screen Retry option: same encounter, and the
     // party restored to exactly what they walked in with.
@@ -704,10 +733,11 @@ class WardedOnesGame {
     const enemies = enemyIds.map(id => {
       const def = this.data.enemies.find(e => e.id === id);
       if (!def) return null;
+      const scaled = this.scaleEnemyForParty(def);
       return {
-        ...def,
-        currentHp: def.stats.hp,
-        currentMp: def.stats.mp,
+        ...scaled,
+        currentHp: scaled.stats.hp,
+        currentMp: scaled.stats.mp,
         statusEffects: [],
         shieldAmount: 0,
       };
