@@ -193,6 +193,7 @@ Phase 9 — Maps
  [x] Multi-map foundation with stable map IDs and per-map persistence
  [x] The Echoing Verge playable area, travel gate, return path, discovery, cache, and encounter
  [x] Two-map v0.3 route acceptance: deterministic full flow plus desktop and touch browser renders
+ [x] Echoing Verge visual identity: ward fragments, echo dial, resonance span, and clear return signage
 
 Every map
 

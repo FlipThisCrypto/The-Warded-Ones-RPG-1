@@ -2784,21 +2784,60 @@ class ExploreManager {
 
   _renderVerge(ctx, canvas, t, glow) {
     const W = canvas.width, H = canvas.height;
+    const motionT = this.game.reducedMotion ? 0 : t;
     const sky = ctx.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, '#071a2b'); sky.addColorStop(0.55, '#10253a'); sky.addColorStop(1, '#071018');
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    // Distant ward fragments give the Verge its own silhouette without adding
+    // collision or asset-loading cost. Their drift freezes in reduced motion.
+    ctx.save();
+    for (let i = 0; i < 8; i++) {
+      const x = 70 + ((i * 137) % 780), y = 105 + ((i * 89) % 410);
+      const drift = Math.sin(motionT * 0.35 + i * 1.7) * 5;
+      ctx.translate(x, y + drift); ctx.rotate(i * 0.47);
+      ctx.fillStyle = i % 2 ? 'rgba(91,222,232,0.055)' : 'rgba(154,92,255,0.06)';
+      ctx.strokeStyle = i % 2 ? 'rgba(91,222,232,0.18)' : 'rgba(154,92,255,0.18)';
+      ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(11, 0); ctx.lineTo(0, 23); ctx.lineTo(-8, 2); ctx.closePath();
+      ctx.fill(); ctx.stroke(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    ctx.restore();
+
+    // The luminous route is the surviving seam between two broken wards.
     ctx.strokeStyle = 'rgba(80,210,230,0.18)'; ctx.lineWidth = 28; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(450, 60); ctx.bezierCurveTo(440, 190, 650, 300, 450, 590); ctx.stroke();
     ctx.strokeStyle = 'rgba(150,100,255,0.22)'; ctx.lineWidth = 3; ctx.stroke();
     for (let i = 0; i < 34; i++) {
       const x = 35 + ((i * 113) % 830), y = 75 + ((i * 67) % 480);
-      const a = 0.18 + Math.max(0, Math.sin(t * 1.6 + i)) * 0.35;
+      const a = 0.18 + Math.max(0, Math.sin(motionT * 1.6 + i)) * 0.35;
       ctx.fillStyle = `rgba(120,230,255,${a})`; ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
     }
-    drawRoundedRect(ctx, 330, 245, 240, 60, 10, 'rgba(15,35,55,0.95)', 'rgba(90,210,230,0.45)', 2);
-    drawRoundedRect(ctx, 92, 120, 158, 65, 10, 'rgba(20,28,48,0.95)', 'rgba(150,100,255,0.4)', 2);
-    ctx.fillStyle = '#9eeeff'; ctx.font = '12px Cinzel, serif'; ctx.textAlign = 'center';
-    ctx.fillText('↑ WARDED GROUNDS', 665, 82);
+
+    // Collision blocks read as intentional landmarks: a shattered resonance
+    // span and a half-buried echo dial, rather than empty outlined rectangles.
+    drawRoundedRect(ctx, 330, 245, 240, 60, 10, 'rgba(9,28,43,0.96)', 'rgba(90,210,230,0.5)', 2);
+    ctx.save(); ctx.setLineDash([12, 9]); ctx.lineDashOffset = -motionT * 10;
+    ctx.strokeStyle = 'rgba(126,239,244,0.32)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(348, 275); ctx.lineTo(552, 275); ctx.stroke();
+    ctx.setLineDash([]);
+    for (let x = 360; x <= 540; x += 45) {
+      ctx.strokeStyle = 'rgba(170,110,255,0.38)'; ctx.strokeRect(x - 6, 269, 12, 12);
+    }
+    ctx.restore();
+
+    drawRoundedRect(ctx, 92, 120, 158, 65, 10, 'rgba(17,22,43,0.96)', 'rgba(150,100,255,0.48)', 2);
+    ctx.save(); ctx.translate(171, 186); ctx.strokeStyle = 'rgba(171,111,255,0.4)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, 48, Math.PI, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 7; i++) {
+      const a = Math.PI + i * Math.PI / 6;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 31, Math.sin(a) * 31); ctx.lineTo(Math.cos(a) * 46, Math.sin(a) * 46); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(104,229,239,0.5)'; ctx.beginPath(); ctx.arc(0, 0, 6 + Math.sin(motionT * 1.8) * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    drawRoundedRect(ctx, 578, 58, 174, 30, 7, 'rgba(4,18,30,0.82)', 'rgba(90,210,230,0.32)', 1);
+    ctx.fillStyle = '#b9f5f6'; ctx.font = '12px Cinzel, serif'; ctx.textAlign = 'center';
+    ctx.fillText('↑ WARDED GROUNDS', 665, 78);
     this._renderEncounterZones(ctx, t, glow);
     this._renderWardStone(ctx, t, glow);
     this._renderNPCs(ctx, t, glow);
