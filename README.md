@@ -57,6 +57,8 @@ company of six and answer what prowls between the stars.
   and a visible recovery screen when game data cannot load
 - ✦ Keyboard, mouse/click, and mobile touch controls
 - ✦ Labeled touch buttons with a dedicated mobile quest-journal action
+- ✦ A distinct Echoing Verge map with floating ward fragments, an echo dial,
+  a shattered resonance span, cache, lore marker, and guardian encounter
 
 ---
 
