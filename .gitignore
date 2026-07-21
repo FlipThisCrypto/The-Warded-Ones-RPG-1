@@ -26,6 +26,24 @@ The Warded Ones - Jesters/*.mp4
 The Warded Ones - Jesters/*.mp3
 The Warded Ones - Jesters/*.cspro
 
+# Source NFT collections (multi-GB source art/video — never committed; the
+# processed runtime copies live in docs/assets/). These are kept locally only.
+/Big Cats/
+/The Warded Ones/
+/The Warded Ones - Jesters/
+/hologram/
+/ring/
+/The Warded Ones.mp3
+/The_Warded_Ones_NFT_License_with_Image*.pdf
+
+# Loose scratch / experiment art at the repo root (real game art is in docs/assets/)
+/overlay*.png
+/sample*.png
+/New project Master Prompt*.docx
+
+# Local agent/editor tooling
+.claude/
+
 # OS files
 .DS_Store
 Thumbs.db
